@@ -1,0 +1,22 @@
+{
+  "name": "@capacitor/plugin-migration-v4-to-v5",
+  "version": "0.0.1",
+  "description": "Utility to help migrate Capacitor 4 plugins to Capacitor 5",
+  "main": "./dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ionic-team/migrate-capacitor-plugin.git"
+  },
+  "keywords": [
+    "capacitor"
+  ],
+  "author": "Ionic Team <hi@ionicframework.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ionic-team/migrate-capacitor-plugin/issues"
+  },
+  "homepage": "https://github.com/ionic-team/migrate-capacitor-plugin#readme"
+}
