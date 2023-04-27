@@ -41,45 +41,15 @@ process.on('unhandledRejection', (error) => {
 });
 
 export const run = async (): Promise<void> => {
-
   const dir = process.cwd();
   const opts = { cwd: dir, stdio: 'inherit' } as const;
   const packageJson = join(dir, 'package.json');
 
-  let pluginJSON = await readJSON(packageJson);
-  if (pluginJSON.capacitor?.android?.src) {
-    const androidDir = resolve(dir, pluginJSON.capacitor.android.src);
-    if (await pathExists(androidDir)) {
-      logger.info("Updating Android files");
-      const variablesAndClasspaths = {
-        variables: variables,
-        'com.android.tools.build:gradle': AGPVersion,
-        'com.google.gms:google-services': gmsVersion,
-      };
-      await updateBuildGradle(join(androidDir, 'build.gradle'), variablesAndClasspaths);
-  
-      await movePackageFromManifestToBuildGradle(
-        join(androidDir, 'src', 'main', 'AndroidManifest.xml'),
-        join(androidDir, 'build.gradle')
-      );
-  
-      updateGradleWrapper(join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'));
-  
-      logger.info("Updating gradle files");
-      await runSubprocess(
-        './gradlew',
-        ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
-        {
-          ...opts,
-          cwd: androidDir,
-        }
-      );
-    }
-  }
+  const pluginJSON = await readJSON(packageJson);
 
   for (const dep of ['@capacitor/ios', '@capacitor/android', '@capacitor/core', '@capacitor/cli']) {
     if (pluginJSON.devDependencies?.[dep]) {
-        pluginJSON.devDependencies[dep] = coreVersion;
+      pluginJSON.devDependencies[dep] = coreVersion;
     }
     if (pluginJSON.dependencies?.[dep]) {
       pluginJSON.dependencies[dep] = coreVersion;
@@ -93,6 +63,36 @@ export const run = async (): Promise<void> => {
   }
 
   await writeJSON(packageJson, pluginJSON, { spaces: 2 });
+
+  if (pluginJSON.capacitor?.android?.src) {
+    const androidDir = resolve(dir, pluginJSON.capacitor.android.src);
+    if (await pathExists(androidDir)) {
+      logger.info('Updating Android files');
+      const variablesAndClasspaths = {
+        variables: variables,
+        'com.android.tools.build:gradle': AGPVersion,
+        'com.google.gms:google-services': gmsVersion,
+      };
+      await updateBuildGradle(join(androidDir, 'build.gradle'), variablesAndClasspaths);
+
+      await movePackageFromManifestToBuildGradle(
+        join(androidDir, 'src', 'main', 'AndroidManifest.xml'),
+        join(androidDir, 'build.gradle')
+      );
+
+      updateGradleWrapper(join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'));
+
+      logger.info('Updating gradle files');
+      await runSubprocess(
+        './gradlew',
+        ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
+        {
+          ...opts,
+          cwd: androidDir,
+        }
+      );
+    }
+  }
 
   logger.info('Plugin migrated to Capacitor 5!');
   logger.info('Next step: You should run `npm install`');
@@ -110,7 +110,7 @@ async function updateBuildGradle(
   if (!gradleFile) {
     return;
   }
-  logger.info("Updating build.gradle");
+  logger.info('Updating build.gradle');
   gradleFile = setAllStringIn(gradleFile, `sourceCompatibility JavaVersion.`, `\n`, `VERSION_17`);
   gradleFile = setAllStringIn(gradleFile, `targetCompatibility JavaVersion.`, `\n`, `VERSION_17`);
 
@@ -161,7 +161,7 @@ async function updateGradleWrapper(filename: string) {
   if (!txt) {
     return;
   }
-  logger.info("Updating gradle wrapper file");
+  logger.info('Updating gradle wrapper file');
   const replaced = setAllStringIn(
     txt,
     'distributionUrl=',
@@ -252,7 +252,7 @@ async function movePackageFromManifestToBuildGradle(manifestFilename: string, bu
     return;
   }
 
-  logger.info("Moving package from AndroidManifest.xml to build.gradle");
+  logger.info('Moving package from AndroidManifest.xml to build.gradle');
 
   writeFileSync(manifestFilename, manifestReplaced, 'utf-8');
   writeFileSync(buildGradleFilename, buildGradleReplaced, 'utf-8');
