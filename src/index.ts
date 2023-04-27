@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, pathExists, readJSON, writeFileSync, writeJSON } from '@ionic/utils-fs';
 import { join, resolve } from 'path';
+import { rimraf } from 'rimraf';
 
 import { logger } from './log';
 import { run as runSubprocess } from './subprocess';
@@ -64,6 +65,14 @@ export const run = async (): Promise<void> => {
 
   await writeJSON(packageJson, pluginJSON, { spaces: 2 });
 
+  rimraf.sync(join(dir, 'node_modules/@capacitor'));
+  rimraf.sync(join(dir, 'package-lock.json'));
+
+  await runSubprocess('npm', ['install'], {
+    ...opts,
+    cwd: dir,
+  });
+
   if (pluginJSON.capacitor?.android?.src) {
     const androidDir = resolve(dir, pluginJSON.capacitor.android.src);
     if (await pathExists(androidDir)) {
@@ -95,7 +104,6 @@ export const run = async (): Promise<void> => {
   }
 
   logger.info('Plugin migrated to Capacitor 5!');
-  logger.info('Next step: You should run `npm install`');
 };
 
 async function updateBuildGradle(
