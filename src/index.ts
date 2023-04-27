@@ -77,6 +77,8 @@ export const run = async (): Promise<void> => {
     const androidDir = resolve(dir, pluginJSON.capacitor.android.src);
     if (await pathExists(androidDir)) {
       logger.info('Updating Android files');
+
+      updateGradleProperties(join(androidDir, 'gradle.properties'));
       const variablesAndClasspaths = {
         variables: variables,
         'com.android.tools.build:gradle': AGPVersion,
@@ -264,4 +266,24 @@ async function movePackageFromManifestToBuildGradle(manifestFilename: string, bu
 
   writeFileSync(manifestFilename, manifestReplaced, 'utf-8');
   writeFileSync(buildGradleFilename, buildGradleReplaced, 'utf-8');
+}
+
+async function updateGradleProperties(filename: string) {
+  const txt = readFile(filename);
+  if (!txt) {
+    return;
+  }
+  logger.info('Remove android.enableJetifier=true from gradle.properties');
+  const lines = txt.split('\n');
+  let linesToKeep = '';
+  for (const line of lines) {
+    // check for enableJetifier
+    const jetifierMatch = line.match(/android\.enableJetifier\s*=\s*true/) || [];
+    const commentMatch = line.match(/# Automatically convert third-party libraries to use AndroidX/) || [];
+
+    if (jetifierMatch.length == 0 && commentMatch.length == 0) {
+      linesToKeep += line + '\n';
+    }
+  }
+  writeFileSync(filename, linesToKeep, { encoding: 'utf-8' });
 }
