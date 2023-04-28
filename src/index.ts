@@ -9,6 +9,7 @@ const coreVersion = 'next';
 const gradleVersion = '8.0.2';
 const AGPVersion = '8.0.0';
 const gmsVersion = '4.3.15';
+const kotlinVersion = '1.8.20';
 const variables = {
   minSdkVersion: 22,
   compileSdkVersion: 33,
@@ -163,6 +164,13 @@ async function updateBuildGradle(
       }
     }
   }
+  gradleFile = setAllStringIn(
+    gradleFile,
+    `ext.kotlin_version = `,
+    `\n`,
+    `project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`
+  );
+
   writeFileSync(filename, gradleFile, 'utf-8');
 }
 
