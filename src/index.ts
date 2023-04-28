@@ -278,7 +278,7 @@ async function movePackageFromManifestToBuildGradle(manifestFilename: string, bu
 
 async function updateGradleProperties(filename: string) {
   const txt = readFile(filename);
-  if (!txt) {
+  if (!txt?.includes('android.enableJetifier=true')) {
     return;
   }
   logger.info('Remove android.enableJetifier=true from gradle.properties');
