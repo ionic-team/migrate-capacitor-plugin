@@ -171,6 +171,13 @@ async function updateBuildGradle(
     `project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`
   );
 
+  gradleFile = setAllStringIn(
+    gradleFile,
+    `implementation "org.jetbrains.kotlin:kotlin-stdlib`,
+    `"`,
+    `:$kotlin_version`
+  );
+
   writeFileSync(filename, gradleFile, 'utf-8');
 }
 
