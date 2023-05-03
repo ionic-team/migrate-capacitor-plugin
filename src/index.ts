@@ -5,7 +5,7 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { run as runSubprocess } from './subprocess';
 
-const coreVersion = 'next';
+const coreVersion = '^5.0.0';
 const gradleVersion = '8.0.2';
 const AGPVersion = '8.0.0';
 const gmsVersion = '4.3.15';
