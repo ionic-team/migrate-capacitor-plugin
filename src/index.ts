@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, pathExists, readJSON, writeFileSync, writeJSON } from '@ionic/utils-fs';
+import { detect } from 'detect-package-manager';
 import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 
@@ -67,9 +68,18 @@ export const run = async (): Promise<void> => {
   await writeJSON(packageJson, pluginJSON, { spaces: 2 });
 
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
-  rimraf.sync(join(dir, 'package-lock.json'));
 
-  await runSubprocess('npm', ['install'], {
+  const pm = await detect();
+  if (pm === 'yarn') {
+    rimraf.sync(join(dir, 'yarn.lock'));
+  } else if (pm === 'pnpm') {
+    rimraf.sync(join(dir, 'pnpm-lock.yaml'));
+  } else {
+    rimraf.sync(join(dir, 'package-lock.json'));
+  }
+  const commandInstall = pm === 'yarn' ? 'add' : 'install';
+
+  await runSubprocess(pm, [commandInstall], {
     ...opts,
     cwd: dir,
   });
@@ -121,7 +131,7 @@ async function updateBuildGradle(
   if (!gradleFile) {
     return;
   }
-  gradleFile = gradleFile.replaceAll(" =  ", " = ");
+  gradleFile = gradleFile.replaceAll(' =  ', ' = ');
   logger.info('Updating build.gradle');
   gradleFile = setAllStringIn(gradleFile, `sourceCompatibility JavaVersion.`, `\n`, `VERSION_17`);
   gradleFile = setAllStringIn(gradleFile, `targetCompatibility JavaVersion.`, `\n`, `VERSION_17`);
