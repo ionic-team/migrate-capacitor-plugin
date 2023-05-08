@@ -246,24 +246,20 @@ async function movePackageFromManifestToBuildGradle(manifestFilename: string, bu
     return;
   }
   let packageName: string;
-  const manifestRegEx = new RegExp(/<manifest ([^>]*package="(.+)"[^>]*)>/);
+  const manifestRegEx = new RegExp(/package="(.+)"/);
   const manifestResults = manifestRegEx.exec(manifestText);
 
   if (manifestResults === null) {
-    logger.error(`Unable to update Android Manifest. Missing <activity> tag`);
+    logger.error(`Unable to update Android Manifest. Package not found.`);
     return;
   } else {
-    packageName = manifestResults[2];
+    packageName = manifestResults[1];
   }
 
   let manifestReplaced = manifestText;
 
-  manifestReplaced = setAllStringIn(
-    manifestText,
-    '<manifest xmlns:android="http://schemas.android.com/apk/res/android"',
-    '>',
-    ``
-  );
+  manifestReplaced = manifestReplaced.replace(manifestRegEx, '');
+  manifestReplaced = manifestReplaced.replace(` \n`, '\n');
 
   if (manifestText == manifestReplaced) {
     logger.error(`Unable to update Android Manifest: no changes were detected in Android Manifest file`);
