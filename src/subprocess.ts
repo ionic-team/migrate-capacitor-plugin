@@ -1,26 +1,30 @@
-import * as cp from 'child_process';
-import kleur from 'kleur';
+import { Subprocess, SubprocessError } from '@ionic/utils-subprocess';
 
-export const spawn = cp.spawn;
+export interface RunCommandOptions {
+  cwd?: string;
+}
 
-export const run = async (cmd: string, args: readonly string[], options: cp.SpawnOptions): Promise<void> => {
-  process.stdout.write(
-    `\n${kleur.cyan(`> ${cmd} ${args.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg)).join(' ')}`)}\n`
-  );
+export async function runCommand(
+  command: string,
+  args: readonly string[],
+  options: RunCommandOptions = {},
+): Promise<string> {
+  const p = new Subprocess(command, args, options);
 
-  await wait(spawn(cmd, args, options));
-};
+  try {
+    return await p.output();
+  } catch (e) {
+    if (e instanceof SubprocessError) {
+      // old behavior of just throwing the stdout/stderr strings
+      throw e.output
+        ? e.output
+        : e.code
+        ? e.code
+        : e.error
+        ? e.error.message
+        : 'Unknown error';
+    }
 
-export const wait = async (p: cp.ChildProcess): Promise<void> => {
-  return new Promise<void>((resolve, reject) => {
-    p.on('error', reject);
-
-    p.on('close', (code, signal) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`bad subprocess exit (code=${code}, signal=${signal})`));
-      }
-    });
-  });
-};
+    throw e;
+  }
+}
