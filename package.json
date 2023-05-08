@@ -47,6 +47,7 @@
   "dependencies": {
     "@ionic/cli-framework-output": "^2.2.6",
     "@ionic/utils-fs": "^3.1.7",
+    "@ionic/utils-subprocess": "^2.1.12",
     "kleur": "^4.1.5",
     "rimraf": "^5.0.0",
     "semver": "^7.5.0"

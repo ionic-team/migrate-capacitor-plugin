@@ -3,7 +3,7 @@ import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 
 import { logger } from './log';
-import { run as runSubprocess } from './subprocess';
+import { runCommand } from './subprocess';
 
 const coreVersion = '^5.0.0';
 const gradleVersion = '8.0.2';
@@ -69,7 +69,7 @@ export const run = async (): Promise<void> => {
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
-  await runSubprocess('npm', ['install'], {
+  await runCommand('npm', ['install'], {
     ...opts,
     cwd: dir,
   });
@@ -95,7 +95,7 @@ export const run = async (): Promise<void> => {
       updateGradleWrapper(join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'));
 
       logger.info('Updating gradle files');
-      await runSubprocess(
+      await runCommand(
         './gradlew',
         ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
         {
