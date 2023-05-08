@@ -1,6 +1,6 @@
 {
   "name": "@capacitor/plugin-migration-v4-to-v5",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Utility to help migrate Capacitor 4 plugins to Capacitor 5",
   "main": "./dist/index.js",
   "scripts": {
