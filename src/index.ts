@@ -246,7 +246,7 @@ async function movePackageFromManifestToBuildGradle(manifestFilename: string, bu
     return;
   }
   let packageName: string;
-  const manifestRegEx = new RegExp(/package="(.+)"/);
+  const manifestRegEx = new RegExp(/package="([^"]+)"/);
   const manifestResults = manifestRegEx.exec(manifestText);
 
   if (manifestResults === null) {
