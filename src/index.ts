@@ -69,10 +69,14 @@ export const run = async (): Promise<void> => {
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
-  await runCommand('npm', ['install'], {
-    ...opts,
-    cwd: dir,
-  });
+  try {
+    await runCommand('npm', ['install'], {
+      ...opts,
+      cwd: dir,
+    });
+  } catch (e: any) {
+    logger.warn('npm install failed, please, install the dependencies using your package manager of choice');
+  }
 
   if (pluginJSON.capacitor?.android?.src) {
     const androidDir = resolve(dir, pluginJSON.capacitor.android.src);
