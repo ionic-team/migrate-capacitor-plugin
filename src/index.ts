@@ -125,7 +125,7 @@ async function updateBuildGradle(
   if (!gradleFile) {
     return;
   }
-  gradleFile = gradleFile.replaceAll(" =  ", " = ");
+  gradleFile = gradleFile.replaceAll(' =  ', ' = ');
   logger.info('Updating build.gradle');
   gradleFile = setAllStringIn(gradleFile, `sourceCompatibility JavaVersion.`, `\n`, `VERSION_17`);
   gradleFile = setAllStringIn(gradleFile, `targetCompatibility JavaVersion.`, `\n`, `VERSION_17`);
