@@ -1,9 +1,9 @@
 # Migrate Capacitor Plugin
 
-Migrate a Capacitor 4 plugin to Capacitor 5.
+Migrate a Capacitor 5 plugin to Capacitor 6.
 
 ## Usage
 
 ```
-npx @capacitor/plugin-migration-v4-to-v5@latest
+npx @capacitor/plugin-migration-v5-to-v6@latest
 ```
