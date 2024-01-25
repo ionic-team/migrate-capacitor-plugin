@@ -5,33 +5,33 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '^5.0.0';
-const gradleVersion = '8.0.2';
-const AGPVersion = '8.0.0';
-const gmsVersion = '4.3.15';
-const kotlinVersion = '1.8.20';
+const coreVersion = 'next';
+const gradleVersion = '8.2.1';
+const AGPVersion = '8.2.1';
+const gmsVersion = '4.4.0';
+const kotlinVersion = '1.9.10';
 const variables = {
   minSdkVersion: 22,
-  compileSdkVersion: 33,
-  targetSdkVersion: 33,
-  androidxActivityVersion: '1.7.0',
+  compileSdkVersion: 34,
+  targetSdkVersion: 34,
+  androidxActivityVersion: '1.8.0',
   androidxAppCompatVersion: '1.6.1',
   androidxCoordinatorLayoutVersion: '1.2.0',
-  androidxCoreVersion: '1.10.0',
-  androidxFragmentVersion: '1.5.6',
-  coreSplashScreenVersion: '1.0.0',
-  androidxWebkitVersion: '1.6.1',
-  androidxMaterialVersion: '1.8.0',
-  androidxBrowserVersion: '1.5.0',
-  androidxExifInterfaceVersion: '1.3.6',
+  androidxCoreVersion: '1.12.0',
+  androidxFragmentVersion: '1.6.2',
+  firebaseMessagingVersion: '23.3.1',
   playServicesLocationVersion: '21.0.1',
+  androidxBrowserVersion: '1.7.0',
+  androidxMaterialVersion: '1.10.0',
+  androidxExifInterfaceVersion: '1.3.6',
+  androidxCoreKTXVersion: '1.12.0',
   googleMapsPlayServicesVersion: '18.1.0',
-  googleMapsUtilsVersion: '3.4.0',
+  googleMapsUtilsVersion: '3.5.3',
   googleMapsKtxVersion: '3.4.0',
   googleMapsUtilsKtxVersion: '3.4.0',
-  kotlinxCoroutinesVersion: '1.6.4',
-  androidxCoreKTXVersion: '1.10.0',
-  firebaseMessagingVersion: '23.1.2',
+  kotlinxCoroutinesVersion: '1.7.3',
+  coreSplashScreenVersion: '1.0.1',
+  androidxWebkitVersion: '1.9.0',
   junitVersion: '4.13.2',
   androidxJunitVersion: '1.1.5',
   androidxEspressoCoreVersion: '3.5.1',
@@ -60,8 +60,8 @@ export const run = async (): Promise<void> => {
       pluginJSON.peerDependencies[dep] = coreVersion;
     }
   }
-  if (pluginJSON.version.startsWith('4.')) {
-    pluginJSON.version = '5.0.0';
+  if (pluginJSON.version.startsWith('5.')) {
+    pluginJSON.version = '6.0.0';
   }
 
   await writeJSON(packageJson, pluginJSON, { spaces: 2 });
