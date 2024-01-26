@@ -110,7 +110,7 @@ export const run = async (): Promise<void> => {
     }
   }
 
-  logger.info('Plugin migrated to Capacitor 5!');
+  logger.info('Plugin migrated to Capacitor 6!');
 };
 
 async function updateBuildGradle(
