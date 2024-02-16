@@ -183,6 +183,12 @@ async function updateBuildGradle(
     `:$kotlin_version`
   );
 
+  const compileSdk = `compileSdkVersion project.hasProperty`;
+  if (gradleFile.includes(compileSdk)) {
+    logger.info('Replacing deprecated compileSdkVersion from build.gradle');
+    gradleFile = gradleFile.replace(compileSdk, `compileSdk project.hasProperty`);
+  }
+
   writeFileSync(filename, gradleFile, 'utf-8');
 }
 
