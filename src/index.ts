@@ -10,6 +10,8 @@ const gradleVersion = '8.2.1';
 const AGPVersion = '8.2.1';
 const gmsVersion = '4.4.0';
 const kotlinVersion = '1.9.10';
+const eslintVersion = '^8.57.0';
+const ionicEslintVersion = '^0.4.0';
 const variables = {
   minSdkVersion: 22,
   compileSdkVersion: 34,
@@ -60,6 +62,13 @@ export const run = async (): Promise<void> => {
       pluginJSON.peerDependencies[dep] = coreVersion;
     }
   }
+  if (pluginJSON.devDependencies?.['@ionic/eslint-config']) {
+    pluginJSON.devDependencies['@ionic/eslint-config'] = ionicEslintVersion;
+    if (pluginJSON.devDependencies?.['eslint']) {
+      pluginJSON.devDependencies['eslint'] = eslintVersion;
+    }
+  }
+
   if (pluginJSON.version.startsWith('5.')) {
     pluginJSON.version = '6.0.0';
   }
