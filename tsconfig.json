@@ -2,7 +2,7 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "importHelpers": true,
-    "lib": ["es2021"],
+    "lib": ["es2021", "ES2022.Error"],
     "module": "commonjs",
     "moduleResolution": "node",
     "noEmitHelpers": true,
@@ -11,7 +11,5 @@
     "strict": true,
     "target": "es2021"
   },
-  "files": [
-    "src/index.ts"
-  ]
+  "files": ["src/index.ts"]
 }
