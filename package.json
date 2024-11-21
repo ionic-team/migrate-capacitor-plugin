@@ -1,7 +1,7 @@
 {
-  "name": "@capacitor/plugin-migration-v5-to-v6",
-  "version": "0.0.6",
-  "description": "Utility to help migrate Capacitor 5 plugins to Capacitor 6",
+  "name": "@capacitor/plugin-migration-v6-to-v7",
+  "version": "0.0.1",
+  "description": "Utility to help migrate Capacitor 6 plugins to Capacitor 7",
   "main": "./dist/index.js",
   "scripts": {
     "lint": "npm run eslint && npm run prettier -- --check",
@@ -18,7 +18,7 @@
     "url": "git+https://github.com/ionic-team/migrate-capacitor-plugin.git"
   },
   "bin": {
-    "plugin-migration-v5-to-v6": "bin/migrate-capacitor-plugin"
+    "plugin-migration-v6-to-v7": "bin/migrate-capacitor-plugin"
   },
   "files": [
     "bin/",
@@ -36,7 +36,6 @@
   "homepage": "https://github.com/ionic-team/migrate-capacitor-plugin#readme",
   "devDependencies": {
     "@ionic/prettier-config": "^2.1.0",
-    "@types/fs-extra": "^11.0.4",
     "@types/node": "^16.18.24",
     "@typescript-eslint/eslint-plugin": "^5.59.1",
     "eslint": "^8.39.0",
@@ -48,6 +47,7 @@
   "dependencies": {
     "@ionic/cli-framework-output": "^2.2.6",
     "@ionic/utils-subprocess": "^2.1.12",
+    "@types/fs-extra": "^11.0.4",
     "fs-extra": "^11.2.0",
     "kleur": "^4.1.5",
     "rimraf": "^5.0.0",
