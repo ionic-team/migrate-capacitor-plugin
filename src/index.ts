@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, pathExists, readJSON, writeFileSync, writeJSON } from '@ionic/utils-fs';
+import { existsSync, readFileSync, pathExists, readJSON, writeFileSync, writeJSON } from 'fs-extra';
 import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 
