@@ -102,7 +102,7 @@ export const run = async (): Promise<void> => {
 
       await movePackageFromManifestToBuildGradle(
         join(androidDir, 'src', 'main', 'AndroidManifest.xml'),
-        join(androidDir, 'build.gradle')
+        join(androidDir, 'build.gradle'),
       );
 
       updateGradleWrapper(join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'));
@@ -114,7 +114,7 @@ export const run = async (): Promise<void> => {
         {
           ...opts,
           cwd: androidDir,
-        }
+        },
       );
     }
   }
@@ -128,7 +128,7 @@ async function updateBuildGradle(
     variables: any;
     'com.android.tools.build:gradle': string;
     'com.google.gms:google-services': string;
-  }
+  },
 ) {
   let gradleFile = readFile(filename);
   if (!gradleFile) {
@@ -182,14 +182,14 @@ async function updateBuildGradle(
     gradleFile,
     `ext.kotlin_version = `,
     `\n`,
-    `project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`
+    `project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`,
   );
 
   gradleFile = setAllStringIn(
     gradleFile,
     `implementation "org.jetbrains.kotlin:kotlin-stdlib`,
     `"`,
-    `:$kotlin_version`
+    `:$kotlin_version`,
   );
 
   const compileSdk = `compileSdkVersion project.hasProperty`;
@@ -212,7 +212,7 @@ async function updateGradleWrapper(filename: string) {
     'distributionUrl=',
     '\n',
     // eslint-disable-next-line no-useless-escape
-    `https\\://services.gradle.org/distributions/gradle-${gradleVersion}-all.zip`
+    `https\\://services.gradle.org/distributions/gradle-${gradleVersion}-all.zip`,
   );
   writeFileSync(filename, replaced, 'utf-8');
 }

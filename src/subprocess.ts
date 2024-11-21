@@ -7,7 +7,7 @@ export interface RunCommandOptions {
 export async function runCommand(
   command: string,
   args: readonly string[],
-  options: RunCommandOptions = {}
+  options: RunCommandOptions = {},
 ): Promise<string> {
   const p = new Subprocess(command, args, options);
 

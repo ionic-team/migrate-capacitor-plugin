@@ -30,19 +30,20 @@
   "author": "Ionic Team <hi@ionicframework.com>",
   "license": "MIT",
   "prettier": "@ionic/prettier-config",
+  "eslintConfig": {
+    "extends": "@ionic/eslint-config/recommended"
+  },
   "bugs": {
     "url": "https://github.com/ionic-team/migrate-capacitor-plugin/issues"
   },
   "homepage": "https://github.com/ionic-team/migrate-capacitor-plugin#readme",
   "devDependencies": {
-    "@ionic/prettier-config": "^2.1.0",
+    "@ionic/eslint-config": "^0.4.0",
+    "@ionic/prettier-config": "^4.0.0",
     "@types/fs-extra": "^11.0.4",
-    "@types/node": "^16.18.24",
-    "@typescript-eslint/eslint-plugin": "^5.59.1",
-    "eslint": "^8.39.0",
-    "eslint-config-prettier": "^8.8.0",
-    "eslint-plugin-import": "^2.27.5",
-    "prettier": "^2.8.8",
+    "@types/node": "^20.17.6",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.3",
     "typescript": "^5.0.4"
   },
   "dependencies": {
@@ -50,7 +51,7 @@
     "@ionic/utils-subprocess": "^2.1.12",
     "fs-extra": "^11.2.0",
     "kleur": "^4.1.5",
-    "rimraf": "^5.0.0",
+    "rimraf": "^6.0.1",
     "semver": "^7.5.0"
   }
 }
