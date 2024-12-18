@@ -97,15 +97,6 @@ export const run = async (): Promise<void> => {
     if (await pathExists(androidDir)) {
       logger.info('Updating Android files');
 
-      const variablesAndClasspaths = {
-        variables: variables,
-        'com.android.tools.build:gradle': AGPVersion,
-        'com.google.gms:google-services': gmsVersion,
-      };
-      await updateBuildGradle(join(androidDir, 'build.gradle'), variablesAndClasspaths);
-
-      updateGradleWrapper(join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'));
-
       logger.info('Updating gradle files');
       await runCommand(
         './gradlew',
@@ -115,11 +106,55 @@ export const run = async (): Promise<void> => {
           cwd: androidDir,
         },
       );
+      // run twice as first run only updates the properties file
+      await runCommand(
+        './gradlew',
+        ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
+        {
+          ...opts,
+          cwd: androidDir,
+        },
+      );
+
+      const variablesAndClasspaths = {
+        variables: variables,
+        'com.android.tools.build:gradle': AGPVersion,
+        'com.google.gms:google-services': gmsVersion,
+      };
+      await updateBuildGradle(join(androidDir, 'build.gradle'), variablesAndClasspaths);
+    }
+  }
+
+  if (pluginJSON.capacitor?.ios.src) {
+    const iosDir = resolve(dir, pluginJSON.capacitor.ios.src);
+    if (await pathExists(iosDir)) {
+      logger.info('Updating iOS files');
+      await updateFile(
+        join(iosDir, 'Plugin.xcodeproj', 'project.pbxproj'),
+        'IPHONEOS_DEPLOYMENT_TARGET = ',
+        ';',
+        '14.0',
+      );
+      await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, '14.0');
+      await updateFile(join(dir, 'Package.swift'), '[.iOS(.v', ')],', '14');
+      await updatePodspec(dir, pluginJSON);
     }
   }
 
   logger.info('Plugin migrated to Capacitor 7!');
 };
+
+function updatePodspec(dir: string, pluginJSON: any) {
+  const podspecFile = pluginJSON.files.find((file: string) => file.includes('.podspec'));
+  let txt = readFile(join(dir, podspecFile));
+  if (!txt) {
+    return false;
+  }
+  txt = txt.replace('s.ios.deployment_target  =', 's.ios.deployment_target =');
+  txt = txt.replace(`s.ios.deployment_target = '13.0'`, `s.ios.deployment_target = '14.0'`);
+  writeFileSync(podspecFile, txt, { encoding: 'utf-8' });
+}
+
 
 async function updateBuildGradle(
   filename: string,
@@ -160,7 +195,7 @@ async function updateBuildGradle(
     let depValueString = depValue;
     let endString = `'`;
     if (typeof depValue === 'number') {
-      depString = `${dep} project.hasProperty('${dep}') ? rootProject.ext.${dep} : `;
+      depString = `project.hasProperty('${dep}') ? rootProject.ext.${dep} : `;
       depValueString = depValue.toString();
       endString = '\n';
     }
@@ -194,31 +229,15 @@ async function updateBuildGradle(
   writeFileSync(filename, gradleFile, 'utf-8');
 }
 
-async function updateGradleWrapper(filename: string) {
-  const txt = readFile(filename);
-  if (!txt) {
-    return;
-  }
-  logger.info('Updating gradle wrapper file');
-  const replaced = setAllStringIn(
-    txt,
-    'distributionUrl=',
-    '\n',
-    // eslint-disable-next-line no-useless-escape
-    `https\\://services.gradle.org/distributions/gradle-${gradleVersion}-all.zip`,
-  );
-  writeFileSync(filename, replaced, 'utf-8');
-}
-
 function readFile(filename: string): string | undefined {
   try {
     if (!existsSync(filename)) {
-      logger.error(`Unable to find ${filename}. Try updating it manually`);
+      logger.warn(`Unable to find ${filename}.`);
       return;
     }
     return readFileSync(filename, 'utf-8');
   } catch (err) {
-    logger.error(`Unable to read ${filename}. Verify it is not already open. ${err}`);
+    logger.warn(`Unable to read ${filename}. Verify it is not already open. ${err}`);
   }
 }
 
@@ -238,4 +257,50 @@ function setAllStringIn(data: string, start: string, end: string, replacement: s
     }
   }
   return result;
+}
+
+async function updateFile(
+  filename: string,
+  textStart: string,
+  textEnd: string,
+  replacement?: string,
+  skipIfNotFound?: boolean,
+): Promise<boolean> {
+  const path = filename;
+  let txt = readFile(path);
+  if (!txt) {
+    return false;
+  }
+  if (txt.includes(textStart)) {
+    if (replacement) {
+      txt = setAllStringIn(txt, textStart, textEnd, replacement);
+      writeFileSync(path, txt, { encoding: 'utf-8' });
+    } else {
+      // Replacing in code so we need to count the number of brackets to find the end of the function in swift
+      const lines = txt.split('\n');
+      let replaced = '';
+      let keep = true;
+      let brackets = 0;
+      for (const line of lines) {
+        if (line.includes(textStart)) {
+          keep = false;
+        }
+        if (!keep) {
+          brackets += (line.match(/{/g) || []).length;
+          brackets -= (line.match(/}/g) || []).length;
+          if (brackets == 0) {
+            keep = true;
+          }
+        } else {
+          replaced += line + '\n';
+        }
+      }
+      writeFileSync(path, replaced, { encoding: 'utf-8' });
+    }
+    return true;
+  } else if (!skipIfNotFound) {
+    logger.warn(`Unable to find "${textStart}" in ${filename}. Try updating it manually`);
+  }
+
+  return false;
 }
