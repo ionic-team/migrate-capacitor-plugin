@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, pathExists, readJSON, writeFileSync, writeJSON } from 'fs-extra';
+import { existsSync, moveSync, readFileSync, pathExists, readJSON, writeFileSync, writeJSON } from 'fs-extra';
 import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 
@@ -13,6 +13,7 @@ const kotlinVersion = '1.9.25';
 const eslintVersion = '^8.57.0';
 const ionicEslintVersion = '^0.4.0';
 const ionicSwiftlintVersion = '^2.0.0';
+const rollupVersion = '^4.24.0';
 const rimrafVersion = '^6.0.1';
 const variables = {
   minSdkVersion: 23,
@@ -73,12 +74,23 @@ export const run = async (): Promise<void> => {
   if (pluginJSON.devDependencies?.['rimraf']) {
     pluginJSON.devDependencies['rimraf'] = rimrafVersion;
   }
+  if (pluginJSON.devDependencies?.['rollup']) {
+    pluginJSON.devDependencies['rollup'] = rollupVersion;
+  }
 
   if (pluginJSON.version.startsWith('6.')) {
     pluginJSON.version = '7.0.0';
   }
 
   await writeJSON(packageJson, pluginJSON, { spaces: 2 });
+
+  let packageJsonText = readFileSync(packageJson, 'utf-8');
+  if (packageJsonText.includes('rollup.config.js')) {
+    packageJsonText = packageJsonText.replace('rollup.config.js','rollup.config.mjs');
+    moveSync(join(dir, 'rollup.config.js'), join(dir, 'rollup.config.mjs'));
+  }
+
+  writeFileSync(packageJson, packageJsonText, 'utf-8');
 
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
   rimraf.sync(join(dir, 'package-lock.json'));
