@@ -8,13 +8,17 @@ import { runCommand } from './subprocess';
 const coreVersion = '7.0.0-rc.0';
 const gradleVersion = '8.11.1';
 const AGPVersion = '8.7.2';
+const eslintVersion = '^8.57.0';
 const gmsVersion = '4.4.2';
 const kotlinVersion = '1.9.25';
-const eslintVersion = '^8.57.0';
 const ionicEslintVersion = '^0.4.0';
 const ionicSwiftlintVersion = '^2.0.0';
-const rollupVersion = '^4.24.0';
+const ionicPrettierVersion = '^4.0.0';
+const prettierJavaVersion = '^2.6.4';
+const prettierVersion = '^3.3.3';
 const rimrafVersion = '^6.0.1';
+const rollupVersion = '^4.24.0';
+let updatePrettierJava = false;
 const variables = {
   minSdkVersion: 23,
   compileSdkVersion: 35,
@@ -78,6 +82,13 @@ export const run = async (): Promise<void> => {
     pluginJSON.devDependencies['rollup'] = rollupVersion;
   }
 
+  if (pluginJSON.devDependencies?.['@ionic/prettier-config']) {
+    pluginJSON.devDependencies['@ionic/prettier-config'] = ionicPrettierVersion;
+    pluginJSON.devDependencies['prettier'] = prettierVersion;
+    pluginJSON.devDependencies['prettier-plugin-java'] = prettierJavaVersion;
+    updatePrettierJava = true;
+  }
+
   if (pluginJSON.version.startsWith('6.')) {
     pluginJSON.version = '7.0.0';
   }
@@ -86,8 +97,15 @@ export const run = async (): Promise<void> => {
 
   let packageJsonText = readFileSync(packageJson, 'utf-8');
   if (packageJsonText.includes('rollup.config.js')) {
-    packageJsonText = packageJsonText.replace('rollup.config.js','rollup.config.mjs');
+    packageJsonText = packageJsonText.replace('rollup.config.js', 'rollup.config.mjs');
     moveSync(join(dir, 'rollup.config.js'), join(dir, 'rollup.config.mjs'));
+  }
+
+  if (updatePrettierJava && !packageJsonText.includes('--plugin=prettier-plugin-java')) {
+    packageJsonText = packageJsonText.replace(
+      '"prettier \\"**/*.{css,html,ts,js,java}\\"',
+      '"prettier \\"**/*.{css,html,ts,js,java}\\" --plugin=prettier-plugin-java',
+    );
   }
 
   writeFileSync(packageJson, packageJsonText, 'utf-8');
@@ -166,7 +184,6 @@ function updatePodspec(dir: string, pluginJSON: any) {
   txt = txt.replace(`s.ios.deployment_target = '13.0'`, `s.ios.deployment_target = '14.0'`);
   writeFileSync(podspecFile, txt, { encoding: 'utf-8' });
 }
-
 
 async function updateBuildGradle(
   filename: string,
