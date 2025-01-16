@@ -14,10 +14,10 @@ const eslintVersion = '^8.57.0';
 const ionicEslintVersion = '^0.4.0';
 const ionicPrettierVersion = '^4.0.0';
 const ionicSwiftlintVersion = '^2.0.0';
-const prettierJavaVersion = '^2.6.4';
-const prettierVersion = '^3.3.3';
+const prettierJavaVersion = '^2.6.6';
+const prettierVersion = '^3.4.2';
 const rimrafVersion = '^6.0.1';
-const rollupVersion = '^4.24.0';
+const rollupVersion = '^4.30.1';
 let updatePrettierJava = false;
 const variables = {
   minSdkVersion: 23,
