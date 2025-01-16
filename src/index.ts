@@ -10,6 +10,7 @@ const gradleVersion = '8.11.1';
 const AGPVersion = '8.7.2';
 const gmsVersion = '4.4.2';
 const kotlinVersion = '1.9.25';
+const docgenVersion = '^0.3.0';
 const eslintVersion = '^8.57.0';
 const ionicEslintVersion = '^0.4.0';
 const ionicPrettierVersion = '^4.0.0';
@@ -87,6 +88,10 @@ export const run = async (): Promise<void> => {
     pluginJSON.devDependencies['prettier'] = prettierVersion;
     pluginJSON.devDependencies['prettier-plugin-java'] = prettierJavaVersion;
     updatePrettierJava = true;
+  }
+
+  if (pluginJSON.devDependencies?.['@capacitor/docgen']) {
+    pluginJSON.devDependencies['@capacitor/docgen'] = docgenVersion;
   }
 
   if (pluginJSON.version.startsWith('6.')) {
