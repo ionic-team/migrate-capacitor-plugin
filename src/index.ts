@@ -1,4 +1,4 @@
-import { existsSync, moveSync, readFileSync, pathExists, readJSON, writeFileSync, writeJSON } from 'fs-extra';
+import { existsSync, moveSync, readFileSync, pathExists, readJSON, removeSync, writeFileSync, writeJSON } from 'fs-extra';
 import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 
@@ -50,6 +50,8 @@ export const run = async (): Promise<void> => {
   const dir = process.cwd();
   const opts = { cwd: dir, stdio: 'inherit' } as const;
   const packageJson = join(dir, 'package.json');
+  const prettierIgnore = join(dir, '.prettierignore');
+  const gitIgnore = join(dir, '.gitignore');
 
   const pluginJSON = await readJSON(packageJson);
 
@@ -106,11 +108,28 @@ export const run = async (): Promise<void> => {
     moveSync(join(dir, 'rollup.config.js'), join(dir, 'rollup.config.mjs'));
   }
 
-  if (updatePrettierJava && !packageJsonText.includes('--plugin=prettier-plugin-java')) {
-    packageJsonText = packageJsonText.replace(
-      '"prettier \\"**/*.{css,html,ts,js,java}\\"',
-      '"prettier \\"**/*.{css,html,ts,js,java}\\" --plugin=prettier-plugin-java',
-    );
+  if (updatePrettierJava) {
+    if (!packageJsonText.includes('--plugin=prettier-plugin-java')) {
+      packageJsonText = packageJsonText.replace(
+        '"prettier \\"**/*.{css,html,ts,js,java}\\"',
+        '"prettier \\"**/*.{css,html,ts,js,java}\\" --plugin=prettier-plugin-java',
+      );
+    }
+    let prettierIgnoreText = readFile(prettierIgnore);
+    let gitIgnoreText = readFile(gitIgnore);
+    if (gitIgnoreText && prettierIgnoreText) {
+      if (gitIgnoreText.includes('build')) {
+        prettierIgnoreText = prettierIgnoreText.replace(`build\n`,'');
+      }
+      if (gitIgnoreText.includes('dist')) {
+        prettierIgnoreText = prettierIgnoreText.replace(`dist\n`,'');
+      }
+      if (!prettierIgnoreText || prettierIgnoreText === `\n`) {
+        removeSync(prettierIgnore);
+      } else {
+        writeFileSync(prettierIgnore, prettierIgnoreText, 'utf-8');
+      }
+    }
   }
 
   writeFileSync(packageJson, packageJsonText, 'utf-8');
