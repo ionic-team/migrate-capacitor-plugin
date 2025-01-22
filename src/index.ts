@@ -1,4 +1,13 @@
-import { existsSync, moveSync, readFileSync, pathExists, readJSON, removeSync, writeFileSync, writeJSON } from 'fs-extra';
+import {
+  existsSync,
+  moveSync,
+  readFileSync,
+  pathExists,
+  readJSON,
+  removeSync,
+  writeFileSync,
+  writeJSON,
+} from 'fs-extra';
 import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 
@@ -116,13 +125,13 @@ export const run = async (): Promise<void> => {
       );
     }
     let prettierIgnoreText = readFile(prettierIgnore);
-    let gitIgnoreText = readFile(gitIgnore);
+    const gitIgnoreText = readFile(gitIgnore);
     if (gitIgnoreText && prettierIgnoreText) {
       if (gitIgnoreText.includes('build')) {
-        prettierIgnoreText = prettierIgnoreText.replace(`build\n`,'');
+        prettierIgnoreText = prettierIgnoreText.replace(`build\n`, '');
       }
       if (gitIgnoreText.includes('dist')) {
-        prettierIgnoreText = prettierIgnoreText.replace(`dist\n`,'');
+        prettierIgnoreText = prettierIgnoreText.replace(`dist\n`, '');
       }
       if (!prettierIgnoreText || prettierIgnoreText === `\n`) {
         removeSync(prettierIgnore);
@@ -191,6 +200,12 @@ export const run = async (): Promise<void> => {
       );
       await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, '14.0');
       await updateFile(join(dir, 'Package.swift'), '[.iOS(.v', ')],', '14');
+      await updateFile(
+        join(dir, 'Package.swift'),
+        '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git",',
+        ')',
+        ` from: "${coreVersion}"`,
+      );
       await updatePodspec(dir, pluginJSON);
     }
   }
