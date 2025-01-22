@@ -191,6 +191,7 @@ export const run = async (): Promise<void> => {
       );
       await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, '14.0');
       await updateFile(join(dir, 'Package.swift'), '[.iOS(.v', ')],', '14');
+      await updateFile(join(dir, 'Package.swift'), '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git",', ')', ` from: "${coreVersion}"`);
       await updatePodspec(dir, pluginJSON);
     }
   }
