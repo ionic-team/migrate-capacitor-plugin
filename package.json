@@ -1,6 +1,6 @@
 {
   "name": "@capacitor/plugin-migration-v6-to-v7",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Utility to help migrate Capacitor 6 plugins to Capacitor 7",
   "main": "./dist/index.js",
   "scripts": {
