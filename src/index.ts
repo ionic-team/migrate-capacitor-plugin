@@ -188,7 +188,7 @@ export const run = async (): Promise<void> => {
     }
   }
 
-  if (pluginJSON.capacitor?.ios.src) {
+  if (pluginJSON.capacitor?.ios?.src) {
     const iosDir = resolve(dir, pluginJSON.capacitor.ios.src);
     if (await pathExists(iosDir)) {
       logger.info('Updating iOS files');
