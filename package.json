@@ -1,7 +1,7 @@
 {
-  "name": "@capacitor/plugin-migration-v6-to-v7",
-  "version": "0.0.7",
-  "description": "Utility to help migrate Capacitor 6 plugins to Capacitor 7",
+  "name": "@capacitor/plugin-migration-v7-to-v8",
+  "version": "0.0.8",
+  "description": "Utility to help migrate Capacitor 7 plugins to Capacitor 8",
   "main": "./dist/index.js",
   "scripts": {
     "lint": "npm run eslint && npm run prettier -- --check",
@@ -18,7 +18,7 @@
     "url": "git+https://github.com/ionic-team/migrate-capacitor-plugin.git"
   },
   "bin": {
-    "plugin-migration-v6-to-v7": "bin/migrate-capacitor-plugin"
+    "plugin-migration-v7-to-v8": "bin/migrate-capacitor-plugin"
   },
   "files": [
     "bin/",
