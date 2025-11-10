@@ -294,6 +294,89 @@ async function updateBuildGradle(
     `:$kotlin_version`,
   );
 
+  gradleFile = gradleFile.replaceAll('url "', 'url = "');
+  gradleFile = gradleFile.replaceAll('namespace "', 'namespace = "');
+  gradleFile = gradleFile.replaceAll('abortOnError true', 'abortOnError = true');
+  gradleFile = gradleFile.replaceAll('warningsAsErrors true', 'warningsAsErrors = true');
+  gradleFile = gradleFile.replaceAll('lintConfig file(', 'lintConfig = file(');
+
+  if (gradleFile.includes('compileSdk ') && !gradleFile.includes('compileSdk =')) {
+    gradleFile = gradleFile.replaceAll('compileSdk ', 'compileSdk = ');
+  }
+
+  if (gradleFile.includes('kotlinOptions')) {
+    const androidStart = gradleFile.indexOf('android {');
+    if (androidStart !== -1) {
+      const kotlinOptionsStart = gradleFile.indexOf('kotlinOptions {', androidStart);
+      if (kotlinOptionsStart !== -1) {
+        const jvmTargetIdx = gradleFile.indexOf('jvmTarget', kotlinOptionsStart);
+        if (jvmTargetIdx !== -1) {
+          const equalsIdx = gradleFile.indexOf('=', jvmTargetIdx);
+          if (equalsIdx !== -1) {
+            const singleQuoteIdx = gradleFile.indexOf("'", equalsIdx);
+            const doubleQuoteIdx = gradleFile.indexOf('"', equalsIdx);
+            const quoteStart = singleQuoteIdx !== -1 ? singleQuoteIdx : doubleQuoteIdx;
+            if (quoteStart !== -1) {
+              const quoteChar = gradleFile[quoteStart];
+              const quoteEnd = gradleFile.indexOf(quoteChar, quoteStart + 1);
+              if (quoteEnd !== -1) {
+                const jvmTargetValue = gradleFile.substring(quoteStart + 1, quoteEnd);
+                const jvmTargetEnum = jvmTargetValue === '1.8' ? 'JVM_1_8' : `JVM_${jvmTargetValue}`;
+
+                let kotlinOptionsEnd = kotlinOptionsStart;
+                let braceCount = 0;
+                let inBlock = false;
+                for (let i = kotlinOptionsStart; i < gradleFile.length; i++) {
+                  if (gradleFile[i] === '{') {
+                    braceCount++;
+                    inBlock = true;
+                  } else if (gradleFile[i] === '}') {
+                    braceCount--;
+                    if (inBlock && braceCount === 0) {
+                      kotlinOptionsEnd = i + 1;
+                      break;
+                    }
+                  }
+                }
+
+                gradleFile = gradleFile.substring(0, kotlinOptionsStart) + gradleFile.substring(kotlinOptionsEnd);
+
+                if (!gradleFile.includes('import org.jetbrains.kotlin.gradle.dsl.JvmTarget')) {
+                  const firstLineEnd = gradleFile.indexOf('\n');
+                  if (firstLineEnd !== -1) {
+                    gradleFile = gradleFile.substring(0, firstLineEnd + 1) + 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget\n' + gradleFile.substring(firstLineEnd + 1);
+                  } else {
+                    gradleFile = 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget\n' + gradleFile;
+                  }
+                }
+
+                let androidEnd = -1;
+                let androidBraceCount = 0;
+                let inAndroidBlock = false;
+                for (let i = androidStart; i < gradleFile.length; i++) {
+                  if (gradleFile[i] === '{') {
+                    androidBraceCount++;
+                    inAndroidBlock = true;
+                  } else if (gradleFile[i] === '}') {
+                    androidBraceCount--;
+                    if (inAndroidBlock && androidBraceCount === 0) {
+                      androidEnd = i;
+                      break;
+                    }
+                  }
+                }
+
+                if (androidEnd !== -1) {
+                  gradleFile = gradleFile.substring(0, androidEnd + 1) + '\n\nkotlin {\n    compilerOptions {\n        jvmTarget = JvmTarget.' + jvmTargetEnum + '\n    }\n}\n' + gradleFile.substring(androidEnd + 1);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   writeFileSync(filename, gradleFile, 'utf-8');
 }
 
