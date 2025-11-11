@@ -294,90 +294,99 @@ async function updateBuildGradle(
     `:$kotlin_version`,
   );
 
-  gradleFile = gradleFile.replaceAll('url "', 'url = "');
-  gradleFile = gradleFile.replaceAll('namespace "', 'namespace = "');
-  gradleFile = gradleFile.replaceAll('abortOnError true', 'abortOnError = true');
-  gradleFile = gradleFile.replaceAll('warningsAsErrors true', 'warningsAsErrors = true');
-  gradleFile = gradleFile.replaceAll('lintConfig file(', 'lintConfig = file(');
+  gradleFile = updateDeprecatedPropertySyntax(gradleFile);
+  gradleFile = updateKotlinOptions(gradleFile);
 
-  if (gradleFile.includes('compileSdk ') && !gradleFile.includes('compileSdk =')) {
-    gradleFile = gradleFile.replaceAll('compileSdk ', 'compileSdk = ');
+  writeFileSync(filename, gradleFile, 'utf-8');
+}
+
+function updateDeprecatedPropertySyntax(gradleFile: string): string {
+  const propertiesToUpdate = [
+    'namespace',
+    'compileSdk',
+    'compileSdkVersion',
+    'testInstrumentationRunner',
+    'versionName',
+    'versionCode',
+    'url',
+    'abortOnError',
+    'warningsAsErrors',
+    'lintConfig',
+    'minifyEnabled',
+    'debugSymbolLevel',
+    'path',
+    'version',
+    'baseline',
+    'sourceCompatibility',
+    'targetCompatibility',
+  ];
+
+  let result = gradleFile;
+
+  for (const prop of propertiesToUpdate) {
+    const regex = new RegExp(`\\b(${prop})[ \\t]+([^=\\t{:])`, 'g');
+    result = result.replace(regex, '$1 = $2');
   }
 
-  if (gradleFile.includes('kotlinOptions')) {
-    const androidStart = gradleFile.indexOf('android {');
-    if (androidStart !== -1) {
-      const kotlinOptionsStart = gradleFile.indexOf('kotlinOptions {', androidStart);
-      if (kotlinOptionsStart !== -1) {
-        const jvmTargetIdx = gradleFile.indexOf('jvmTarget', kotlinOptionsStart);
-        if (jvmTargetIdx !== -1) {
-          const equalsIdx = gradleFile.indexOf('=', jvmTargetIdx);
-          if (equalsIdx !== -1) {
-            const singleQuoteIdx = gradleFile.indexOf("'", equalsIdx);
-            const doubleQuoteIdx = gradleFile.indexOf('"', equalsIdx);
-            const quoteStart = singleQuoteIdx !== -1 ? singleQuoteIdx : doubleQuoteIdx;
-            if (quoteStart !== -1) {
-              const quoteChar = gradleFile[quoteStart];
-              const quoteEnd = gradleFile.indexOf(quoteChar, quoteStart + 1);
-              if (quoteEnd !== -1) {
-                const jvmTargetValue = gradleFile.substring(quoteStart + 1, quoteEnd);
-                const jvmTargetEnum = jvmTargetValue === '1.8' ? 'JVM_1_8' : `JVM_${jvmTargetValue}`;
+  return result;
+}
 
-                let kotlinOptionsEnd = kotlinOptionsStart;
-                let braceCount = 0;
-                let inBlock = false;
-                for (let i = kotlinOptionsStart; i < gradleFile.length; i++) {
-                  if (gradleFile[i] === '{') {
-                    braceCount++;
-                    inBlock = true;
-                  } else if (gradleFile[i] === '}') {
-                    braceCount--;
-                    if (inBlock && braceCount === 0) {
-                      kotlinOptionsEnd = i + 1;
-                      break;
-                    }
-                  }
-                }
+function updateKotlinOptions(gradleFile: string): string {
+  const kotlinOptionsRegex = /kotlinOptions\s*\{\s*jvmTarget\s*=\s*['"](\d+\.?\d*)['"][\s\S]*?\}/;
+  const match = kotlinOptionsRegex.exec(gradleFile);
 
-                gradleFile = gradleFile.substring(0, kotlinOptionsStart) + gradleFile.substring(kotlinOptionsEnd);
+  if (!match) {
+    return gradleFile;
+  }
 
-                if (!gradleFile.includes('import org.jetbrains.kotlin.gradle.dsl.JvmTarget')) {
-                  const firstLineEnd = gradleFile.indexOf('\n');
-                  if (firstLineEnd !== -1) {
-                    gradleFile = gradleFile.substring(0, firstLineEnd + 1) + 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget\n' + gradleFile.substring(firstLineEnd + 1);
-                  } else {
-                    gradleFile = 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget\n' + gradleFile;
-                  }
-                }
+  const jvmTargetValue = match[1];
+  const enumValue = `JVM_${jvmTargetValue.replace('.', '_')}`;
 
-                let androidEnd = -1;
-                let androidBraceCount = 0;
-                let inAndroidBlock = false;
-                for (let i = androidStart; i < gradleFile.length; i++) {
-                  if (gradleFile[i] === '{') {
-                    androidBraceCount++;
-                    inAndroidBlock = true;
-                  } else if (gradleFile[i] === '}') {
-                    androidBraceCount--;
-                    if (inAndroidBlock && androidBraceCount === 0) {
-                      androidEnd = i;
-                      break;
-                    }
-                  }
-                }
+  let result = gradleFile;
 
-                if (androidEnd !== -1) {
-                  gradleFile = gradleFile.substring(0, androidEnd + 1) + '\n\nkotlin {\n    compilerOptions {\n        jvmTarget = JvmTarget.' + jvmTargetEnum + '\n    }\n}\n' + gradleFile.substring(androidEnd + 1);
-                }
-              }
-            }
-          }
-        }
-      }
+  if (!result.includes('import org.jetbrains.kotlin.gradle.dsl.JvmTarget')) {
+    const firstNonCommentLine = result.split('\n').findIndex((line) => {
+      const trimmed = line.trim();
+      return trimmed.length > 0 && !trimmed.startsWith('//') && !trimmed.startsWith('/*');
+    });
+    const lines = result.split('\n');
+    if (firstNonCommentLine >= 0) {
+      lines.splice(firstNonCommentLine, 0, 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget');
+      result = lines.join('\n');
     }
   }
 
-  writeFileSync(filename, gradleFile, 'utf-8');
+  result = result.replace(kotlinOptionsRegex, '');
+  result = result.replace(/\n\s*\n\s*\n/g, '\n\n');
+
+  const kotlinBlockRegex = /\nkotlin\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/;
+  const kotlinBlockMatch = kotlinBlockRegex.exec(result);
+
+  const compilerOptionsBlock = `    compilerOptions {\n        jvmTarget = JvmTarget.${enumValue}\n    }`;
+
+  if (kotlinBlockMatch) {
+    // Kotlin block exists, add compilerOptions to it if not already present
+    if (!kotlinBlockMatch[0].includes('compilerOptions')) {
+      const kotlinBlockContent = kotlinBlockMatch[1];
+      const existingContent = kotlinBlockContent.trimEnd();
+      const newKotlinBlock = `\nkotlin {${existingContent}\n${compilerOptionsBlock}\n}`;
+      result = result.replace(kotlinBlockRegex, newKotlinBlock);
+    }
+  } else {
+    // No kotlin block exists, create one after the android block
+    const androidBlockRegex = /android\s*\{[\s\S]*?\n\}/;
+    const androidMatch = androidBlockRegex.exec(result);
+
+    if (androidMatch) {
+      const insertPosition = androidMatch.index + androidMatch[0].length;
+      const kotlinBlock = `\n\nkotlin {\n${compilerOptionsBlock}\n}`;
+      result = result.slice(0, insertPosition) + kotlinBlock + result.slice(insertPosition);
+    }
+  }
+
+  logger.info('Updated kotlinOptions to compilerOptions for Kotlin 2.2.0');
+
+  return result;
 }
 
 function readFile(filename: string): string | undefined {
