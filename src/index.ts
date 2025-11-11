@@ -105,8 +105,8 @@ export const run = async (): Promise<void> => {
     pluginJSON.devDependencies['@capacitor/docgen'] = docgenVersion;
   }
 
-  if (pluginJSON.version.startsWith('6.')) {
-    pluginJSON.version = '7.0.0';
+  if (pluginJSON.version?.startsWith('7.')) {
+    pluginJSON.version = '8.0.0';
   }
 
   await writeJSON(packageJson, pluginJSON, { spaces: 2 });
@@ -346,6 +346,7 @@ function updateKotlinOptions(gradleFile: string): string {
 
   if (!result.includes('import org.jetbrains.kotlin.gradle.dsl.JvmTarget')) {
     const firstNonCommentLine = result.split('\n').findIndex((line) => {
+      if (!line) return false;
       const trimmed = line.trim();
       return trimmed.length > 0 && !trimmed.startsWith('//') && !trimmed.startsWith('/*');
     });
