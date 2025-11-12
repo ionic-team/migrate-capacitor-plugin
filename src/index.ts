@@ -14,7 +14,7 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '8.0.0-alpha.3';
+const coreVersion = 'next';
 const gradleVersion = '8.14.3';
 const AGPVersion = '8.13.0';
 const gmsVersion = '4.4.4';
@@ -66,13 +66,13 @@ export const run = async (): Promise<void> => {
 
   for (const dep of ['@capacitor/ios', '@capacitor/android', '@capacitor/core', '@capacitor/cli']) {
     if (pluginJSON.devDependencies?.[dep]) {
-      pluginJSON.devDependencies[dep] = `^${coreVersion}`;
+      pluginJSON.devDependencies[dep] = coreVersion;
     }
     if (pluginJSON.dependencies?.[dep]) {
-      pluginJSON.dependencies[dep] = `^${coreVersion}`;
+      pluginJSON.dependencies[dep] = coreVersion;
     }
     if (pluginJSON.peerDependencies?.[dep]) {
-      pluginJSON.peerDependencies[dep] = `>=${coreVersion}`;
+      pluginJSON.peerDependencies[dep] = coreVersion;
     }
   }
   if (pluginJSON.devDependencies?.['@ionic/eslint-config']) {
