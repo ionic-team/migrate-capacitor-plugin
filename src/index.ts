@@ -14,7 +14,7 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = 'next';
+const coreVersion = '8.0.0-alpha.3';
 const gradleVersion = '8.14.3';
 const AGPVersion = '8.13.0';
 const gmsVersion = '4.4.4';
@@ -72,7 +72,7 @@ export const run = async (): Promise<void> => {
       pluginJSON.dependencies[dep] = coreVersion;
     }
     if (pluginJSON.peerDependencies?.[dep]) {
-      pluginJSON.peerDependencies[dep] = coreVersion;
+      pluginJSON.peerDependencies[dep] = `>=${coreVersion}`;
     }
   }
   if (pluginJSON.devDependencies?.['@ionic/eslint-config']) {
