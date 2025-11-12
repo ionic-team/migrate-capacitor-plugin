@@ -31,7 +31,7 @@ const rollupVersion = '^4.30.1';
 let updatePrettierJava = false;
 const variables = {
   minSdkVersion: 24,
-  compileSdkVersion: 36,
+  compileSdk: 36,
   targetSdkVersion: 36,
   androidxActivityVersion: '1.11.0',
   androidxAppCompatVersion: '1.7.1',
@@ -237,6 +237,7 @@ async function updateBuildGradle(
     return;
   }
   gradleFile = gradleFile.replaceAll(' =  ', ' = ');
+  gradleFile = gradleFile.replace(/\bcompileSdkVersion\b/g, 'compileSdk');
   logger.info('Updating build.gradle');
   gradleFile = setAllStringIn(gradleFile, `sourceCompatibility JavaVersion.`, `\n`, `VERSION_21`);
   gradleFile = setAllStringIn(gradleFile, `targetCompatibility JavaVersion.`, `\n`, `VERSION_21`);
@@ -304,7 +305,6 @@ function updateDeprecatedPropertySyntax(gradleFile: string): string {
   const propertiesToUpdate = [
     'namespace',
     'compileSdk',
-    'compileSdkVersion',
     'testInstrumentationRunner',
     'versionName',
     'versionCode',
