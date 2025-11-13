@@ -280,12 +280,12 @@ async function updateBuildGradle(
       }
     }
   }
-  gradleFile = setAllStringIn(
-    gradleFile,
-    `ext.kotlin_version = `,
-    `\n`,
-    `project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`,
-  );
+
+  const kotlinStart = `ext.kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '`;
+  if (gradleFile.includes(kotlinStart)) {
+    gradleFile = setAllStringIn(gradleFile, kotlinStart, `'`, `${kotlinVersion}'`);
+    logger.info(`Set kotlin_version = ${kotlinVersion}.`);
+  }
 
   gradleFile = setAllStringIn(
     gradleFile,
