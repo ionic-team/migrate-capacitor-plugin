@@ -66,10 +66,10 @@ export const run = async (): Promise<void> => {
 
   for (const dep of ['@capacitor/ios', '@capacitor/android', '@capacitor/core', '@capacitor/cli']) {
     if (pluginJSON.devDependencies?.[dep]) {
-      pluginJSON.devDependencies[dep] = coreVersion;
+      pluginJSON.devDependencies[dep] = `^${coreVersion}`;
     }
     if (pluginJSON.dependencies?.[dep]) {
-      pluginJSON.dependencies[dep] = coreVersion;
+      pluginJSON.dependencies[dep] = `^${coreVersion}`;
     }
     if (pluginJSON.peerDependencies?.[dep]) {
       pluginJSON.peerDependencies[dep] = `>=${coreVersion}`;
