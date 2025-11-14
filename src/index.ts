@@ -14,7 +14,7 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '8.0.0-alpha.3';
+const coreVersion = '8.0.0-beta.0';
 const gradleVersion = '8.14.3';
 const AGPVersion = '8.13.0';
 const gmsVersion = '4.4.4';
