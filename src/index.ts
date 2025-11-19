@@ -20,15 +20,15 @@ const AGPVersion = '8.13.0';
 const gmsVersion = '4.4.4';
 const kotlinVersion = '2.2.20';
 const docgenVersion = '^0.3.0';
-const eslintVersion = '^8.57.0';
+const eslintVersion = '^8.57.1';
 const ionicEslintVersion = '^0.4.0';
 const ionicPrettierVersion = '^4.0.0';
 const ionicSwiftlintVersion = '^2.0.0';
-const prettierJavaVersion = '^2.6.6';
-const prettierVersion = '^3.4.2';
-const rimrafVersion = '^6.0.1';
-const rollupVersion = '^4.30.1';
-let updatePrettierJava = false;
+const prettierJavaVersion = '^2.7.7';
+const prettierVersion = '^3.6.2';
+const rimrafVersion = '^6.1.0';
+const rollupVersion = '^4.53.2';
+let updatePrettierJava = true;
 const variables = {
   minSdkVersion: 24,
   compileSdkVersion: 36,
@@ -211,6 +211,10 @@ export const run = async (): Promise<void> => {
   }
 
   logger.info('Plugin migrated to Capacitor 8!');
+
+  logger.info('');
+  logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
+  logger.info('We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.');
 };
 
 function updatePodspec(dir: string, pluginJSON: any) {
@@ -281,16 +285,11 @@ async function updateBuildGradle(
     }
   }
 
-  const kotlinStart = `ext.kotlin_version = `;
-  if (gradleFile.includes(kotlinStart)) {
-    gradleFile = setAllStringIn(
-      gradleFile,
-      kotlinStart,
-      `'`,
-      `project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}`,
-    );
+  const kotlinRegex = /ext\.kotlin_version\s*=\s*(?:project\.hasProperty\("kotlin_version"\)\s*\?\s*rootProject\.ext\.kotlin_version\s*:\s*)?['"]([^'"]+)['"]/;
+  gradleFile = gradleFile.replace(kotlinRegex, () => {
     logger.info(`Set kotlin_version = ${kotlinVersion}.`);
-  }
+    return `ext.kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`;
+  });
 
   gradleFile = setAllStringIn(
     gradleFile,
