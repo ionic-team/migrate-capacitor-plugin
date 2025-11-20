@@ -14,7 +14,7 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '8.0.0-beta.0';
+const coreVersion = '8.0.0';
 const gradleVersion = '8.14.3';
 const AGPVersion = '8.13.0';
 const gmsVersion = '4.4.4';
@@ -28,7 +28,7 @@ const prettierJavaVersion = '^2.7.7';
 const prettierVersion = '^3.6.2';
 const rimrafVersion = '^6.1.0';
 const rollupVersion = '^4.53.2';
-let updatePrettierJava = true;
+let updatePrettierJava = false;
 const variables = {
   minSdkVersion: 24,
   compileSdkVersion: 36,
@@ -94,7 +94,16 @@ export const run = async (): Promise<void> => {
     pluginJSON.devDependencies['rollup'] = rollupVersion;
   }
 
+  let prettierUpdatedFromV2 = false;
   if (pluginJSON.devDependencies?.['@ionic/prettier-config']) {
+    const existingPrettierVersion = pluginJSON.devDependencies?.['prettier'];
+    if (existingPrettierVersion) {
+      const semver = await import('semver');
+      const cleanVersion = semver.coerce(existingPrettierVersion);
+      if (cleanVersion && semver.lt(cleanVersion, '3.0.0')) {
+        prettierUpdatedFromV2 = true;
+      }
+    }
     pluginJSON.devDependencies['@ionic/prettier-config'] = ionicPrettierVersion;
     pluginJSON.devDependencies['prettier'] = prettierVersion;
     pluginJSON.devDependencies['prettier-plugin-java'] = prettierJavaVersion;
@@ -212,9 +221,11 @@ export const run = async (): Promise<void> => {
 
   logger.info('Plugin migrated to Capacitor 8!');
 
-  logger.info('');
-  logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
-  logger.info('We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.');
+  if (prettierUpdatedFromV2) {
+    logger.info('');
+    logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
+    logger.info('We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.');
+  }
 };
 
 function updatePodspec(dir: string, pluginJSON: any) {
@@ -355,7 +366,7 @@ function updateKotlinOptions(gradleFile: string): string {
     });
     const lines = result.split('\n');
     if (firstNonCommentLine >= 0) {
-      lines.splice(firstNonCommentLine, 0, 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget');
+      lines.splice(firstNonCommentLine, 0, 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget', '');
       result = lines.join('\n');
     }
   }
