@@ -53,7 +53,7 @@ const variables = {
   googleMapsUtilsVersion: '3.19.1',
   googleMapsKtxVersion: '5.2.1',
   googleMapsUtilsKtxVersion: '5.2.1',
-  kotlinxCoroutinesVersion: '1.10.2'
+  kotlinxCoroutinesVersion: '1.10.2',
 };
 
 process.on('unhandledRejection', (error) => {
