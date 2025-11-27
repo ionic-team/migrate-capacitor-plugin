@@ -325,20 +325,8 @@ function updateDeprecatedPropertySyntax(gradleFile: string): string {
   const propertiesToUpdate = [
     'namespace',
     'compileSdk',
-    'testInstrumentationRunner',
-    'versionName',
-    'versionCode',
     'url',
     'abortOnError',
-    'warningsAsErrors',
-    'lintConfig',
-    'minifyEnabled',
-    'debugSymbolLevel',
-    'path',
-    'version',
-    'baseline',
-    'sourceCompatibility',
-    'targetCompatibility',
   ];
 
   let result = gradleFile;
