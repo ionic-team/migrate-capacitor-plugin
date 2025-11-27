@@ -48,6 +48,12 @@ const variables = {
   junitVersion: '4.13.2',
   androidxJunitVersion: '1.3.0',
   androidxEspressoCoreVersion: '3.7.0',
+  androidxCoreKTXVersion: '1.17.0',
+  googleMapsPlayServicesVersion: '19.2.0',
+  googleMapsUtilsVersion: '3.19.1',
+  googleMapsKtxVersion: '5.2.1',
+  googleMapsUtilsKtxVersion: '5.2.1',
+  kotlinxCoroutinesVersion: '1.10.2'
 };
 
 process.on('unhandledRejection', (error) => {
