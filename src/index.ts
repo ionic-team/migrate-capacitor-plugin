@@ -347,8 +347,7 @@ function updateKotlinOptions(gradleFile: string): string {
     return gradleFile;
   }
 
-  const jvmTargetValue = match[1];
-  const enumValue = `JVM_${jvmTargetValue.replace('.', '_')}`;
+  const jvmTargetValue = `JVM_21`;
 
   let result = gradleFile;
 
@@ -365,13 +364,12 @@ function updateKotlinOptions(gradleFile: string): string {
     }
   }
 
-  result = result.replace(kotlinOptionsRegex, '');
-  result = result.replace(/\n\s*\n\s*\n/g, '\n\n');
+  result = result.replace(/\n\s*kotlinOptions\s*\{[\s\S]*?\}\s*\n/g, '\n'); 
 
   const kotlinBlockRegex = /\nkotlin\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/;
   const kotlinBlockMatch = kotlinBlockRegex.exec(result);
 
-  const compilerOptionsBlock = `    compilerOptions {\n        jvmTarget = JvmTarget.${enumValue}\n    }`;
+  const compilerOptionsBlock = `    compilerOptions {\n        jvmTarget = JvmTarget.${jvmTargetValue}\n    }`;
 
   if (kotlinBlockMatch) {
     // Kotlin block exists, add compilerOptions to it if not already present
