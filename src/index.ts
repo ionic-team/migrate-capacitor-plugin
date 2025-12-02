@@ -103,9 +103,7 @@ export const run = async (): Promise<void> => {
   }
   if (pluginJSON.devDependencies?.['typescript']) {
     pluginJSON.devDependencies['typescript'] = typeScriptVersion;
-    if (pluginJSON.devDependencies?.['@types/node']) {
-      pluginJSON.devDependencies['@types/node'] = typesNodeVersion;
-    }
+    pluginJSON.devDependencies['@types/node'] = typesNodeVersion;
   }
 
   let prettierUpdatedFromV2 = false;
