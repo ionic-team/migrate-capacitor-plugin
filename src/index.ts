@@ -308,8 +308,8 @@ async function updateBuildGradle(
     return `ext.kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`;
   });
 
-  const blockkotlinRegex = /ext\s*\{[\s\S]*?\}/gm;
-  gradleFile = gradleFile.replace(blockkotlinRegex, (block) => {
+  const blockKotlinRegex = /ext\s*\{[\s\S]*?\}/gm;
+  gradleFile = gradleFile.replace(blockKotlinRegex, (block) => {
     return block.replace(
       /kotlin_version\s*=\s*['"][^'"]+['"]|kotlin_version\s*=\s*project\.hasProperty\("kotlin_version"\)\s*\?\s*rootProject\.ext\.kotlin_version\s*:\s*['"][^'"]+['"]/,
       `kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`,
