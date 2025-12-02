@@ -391,7 +391,7 @@ function updateKotlinOptions(gradleFile: string): string {
     }
   }
 
-  logger.info('Updated kotlinOptions to compilerOptions for Kotlin 2.2.0');
+  logger.info('Updated kotlinOptions to compilerOptions for Kotlin 2');
 
   return result;
 }
