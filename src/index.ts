@@ -28,6 +28,8 @@ const prettierJavaVersion = '^2.7.7';
 const prettierVersion = '^3.6.2';
 const rimrafVersion = '^6.1.0';
 const rollupVersion = '^4.53.2';
+const typesNodeVersion = '^24.10.1';
+const typeScriptVersion = '^5.9.3';
 let updatePrettierJava = false;
 const variables = {
   minSdkVersion: 24,
@@ -98,6 +100,12 @@ export const run = async (): Promise<void> => {
   }
   if (pluginJSON.devDependencies?.['rollup']) {
     pluginJSON.devDependencies['rollup'] = rollupVersion;
+  }
+  if (pluginJSON.devDependencies?.['typescript']) {
+    pluginJSON.devDependencies['typescript'] = typeScriptVersion;
+  }
+  if (pluginJSON.devDependencies?.['@types/node']) {
+    pluginJSON.devDependencies['@types/node'] = typesNodeVersion;
   }
 
   let prettierUpdatedFromV2 = false;
