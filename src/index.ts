@@ -324,11 +324,20 @@ async function updateBuildGradle(
     );
   });
 
+  const hasKotlinVersion = gradleFile.includes('kotlin_version');
+  const versionToUse = hasKotlinVersion ? '$kotlin_version' : kotlinVersion;
   gradleFile = setAllStringIn(
     gradleFile,
     `implementation "org.jetbrains.kotlin:kotlin-stdlib`,
     `"`,
-    `:$kotlin_version`,
+    `:${versionToUse}`,
+  );
+
+  gradleFile = setAllStringIn(
+    gradleFile,
+    `classpath "org.jetbrains.kotlin:kotlin-gradle-plugin`,
+    `"`,
+    `:${versionToUse}`,
   );
 
   gradleFile = updateDeprecatedPropertySyntax(gradleFile);
