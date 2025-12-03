@@ -19,7 +19,7 @@ const gradleVersion = '8.14.3';
 const AGPVersion = '8.13.0';
 const gmsVersion = '4.4.4';
 const kotlinVersion = '2.2.20';
-const docgenVersion = '^0.3.0';
+const docgenVersion = '^0.3.1';
 const eslintVersion = '^8.57.1';
 const ionicEslintVersion = '^0.4.0';
 const ionicPrettierVersion = '^4.0.0';
@@ -103,6 +103,8 @@ export const run = async (): Promise<void> => {
   }
   if (pluginJSON.devDependencies?.['typescript']) {
     pluginJSON.devDependencies['typescript'] = typeScriptVersion;
+  }
+  if (pluginJSON.devDependencies?.['@types/node']) {
     pluginJSON.devDependencies['@types/node'] = typesNodeVersion;
   }
 
