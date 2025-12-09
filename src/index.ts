@@ -14,40 +14,48 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '7.0.0';
-const gradleVersion = '8.11.1';
-const AGPVersion = '8.7.2';
-const gmsVersion = '4.4.2';
-const kotlinVersion = '1.9.25';
-const docgenVersion = '^0.3.0';
-const eslintVersion = '^8.57.0';
+const coreVersion = '8.0.0';
+const gradleVersion = '8.14.3';
+const AGPVersion = '8.13.0';
+const gmsVersion = '4.4.4';
+const kotlinVersion = '2.2.20';
+const docgenVersion = '^0.3.1';
+const eslintVersion = '^8.57.1';
 const ionicEslintVersion = '^0.4.0';
 const ionicPrettierVersion = '^4.0.0';
 const ionicSwiftlintVersion = '^2.0.0';
-const prettierJavaVersion = '^2.6.6';
-const prettierVersion = '^3.4.2';
-const rimrafVersion = '^6.0.1';
-const rollupVersion = '^4.30.1';
+const prettierJavaVersion = '^2.7.7';
+const prettierVersion = '^3.6.2';
+const rimrafVersion = '^6.1.0';
+const rollupVersion = '^4.53.2';
+const typesNodeVersion = '^24.10.1';
+const typeScriptVersion = '^5.9.3';
 let updatePrettierJava = false;
 const variables = {
-  minSdkVersion: 23,
-  compileSdkVersion: 35,
-  targetSdkVersion: 35,
-  androidxActivityVersion: '1.9.2',
-  androidxAppCompatVersion: '1.7.0',
-  androidxCoordinatorLayoutVersion: '1.2.0',
-  androidxCoreVersion: '1.15.0',
-  androidxFragmentVersion: '1.8.4',
-  firebaseMessagingVersion: '24.1.0',
+  minSdkVersion: 24,
+  compileSdkVersion: 36,
+  targetSdkVersion: 36,
+  androidxActivityVersion: '1.11.0',
+  androidxAppCompatVersion: '1.7.1',
+  androidxCoordinatorLayoutVersion: '1.3.0',
+  androidxCoreVersion: '1.17.0',
+  androidxFragmentVersion: '1.8.9',
+  firebaseMessagingVersion: '25.0.1',
   playServicesLocationVersion: '21.3.0',
-  androidxBrowserVersion: '1.8.0',
-  androidxMaterialVersion: '1.12.0',
-  androidxExifInterfaceVersion: '1.3.7',
-  coreSplashScreenVersion: '1.0.1',
-  androidxWebkitVersion: '1.12.1',
+  androidxBrowserVersion: '1.9.0',
+  androidxMaterialVersion: '1.13.0',
+  androidxExifInterfaceVersion: '1.4.1',
+  coreSplashScreenVersion: '1.2.0',
+  androidxWebkitVersion: '1.14.0',
   junitVersion: '4.13.2',
-  androidxJunitVersion: '1.2.1',
-  androidxEspressoCoreVersion: '3.6.1',
+  androidxJunitVersion: '1.3.0',
+  androidxEspressoCoreVersion: '3.7.0',
+  androidxCoreKTXVersion: '1.17.0',
+  googleMapsPlayServicesVersion: '19.2.0',
+  googleMapsUtilsVersion: '3.19.1',
+  googleMapsKtxVersion: '5.2.1',
+  googleMapsUtilsKtxVersion: '5.2.1',
+  kotlinxCoroutinesVersion: '1.10.2',
 };
 
 process.on('unhandledRejection', (error) => {
@@ -93,8 +101,23 @@ export const run = async (): Promise<void> => {
   if (pluginJSON.devDependencies?.['rollup']) {
     pluginJSON.devDependencies['rollup'] = rollupVersion;
   }
+  if (pluginJSON.devDependencies?.['typescript']) {
+    pluginJSON.devDependencies['typescript'] = typeScriptVersion;
+  }
+  if (pluginJSON.devDependencies?.['@types/node']) {
+    pluginJSON.devDependencies['@types/node'] = typesNodeVersion;
+  }
 
+  let prettierUpdatedFromV2 = false;
   if (pluginJSON.devDependencies?.['@ionic/prettier-config']) {
+    const existingPrettierVersion = pluginJSON.devDependencies?.['prettier'];
+    if (existingPrettierVersion) {
+      const semver = await import('semver');
+      const cleanVersion = semver.coerce(existingPrettierVersion);
+      if (cleanVersion && semver.lt(cleanVersion, '3.0.0')) {
+        prettierUpdatedFromV2 = true;
+      }
+    }
     pluginJSON.devDependencies['@ionic/prettier-config'] = ionicPrettierVersion;
     pluginJSON.devDependencies['prettier'] = prettierVersion;
     pluginJSON.devDependencies['prettier-plugin-java'] = prettierJavaVersion;
@@ -105,8 +128,8 @@ export const run = async (): Promise<void> => {
     pluginJSON.devDependencies['@capacitor/docgen'] = docgenVersion;
   }
 
-  if (pluginJSON.version.startsWith('6.')) {
-    pluginJSON.version = '7.0.0';
+  if (pluginJSON.version?.startsWith('7.')) {
+    pluginJSON.version = '8.0.0';
   }
 
   await writeJSON(packageJson, pluginJSON, { spaces: 2 });
@@ -196,10 +219,10 @@ export const run = async (): Promise<void> => {
         join(iosDir, 'Plugin.xcodeproj', 'project.pbxproj'),
         'IPHONEOS_DEPLOYMENT_TARGET = ',
         ';',
-        '14.0',
+        '15.0',
       );
-      await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, '14.0');
-      await updateFile(join(dir, 'Package.swift'), '[.iOS(.v', ')],', '14');
+      await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, '15.0');
+      await updateFile(join(dir, 'Package.swift'), '[.iOS(.v', ')],', '15');
       await updateFile(
         join(dir, 'Package.swift'),
         '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git",',
@@ -210,7 +233,13 @@ export const run = async (): Promise<void> => {
     }
   }
 
-  logger.info('Plugin migrated to Capacitor 7!');
+  logger.info('Plugin migrated to Capacitor 8!');
+
+  if (prettierUpdatedFromV2) {
+    logger.info('');
+    logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
+    logger.info('We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.');
+  }
 };
 
 function updatePodspec(dir: string, pluginJSON: any) {
@@ -220,7 +249,7 @@ function updatePodspec(dir: string, pluginJSON: any) {
     return false;
   }
   txt = txt.replace('s.ios.deployment_target  =', 's.ios.deployment_target =');
-  txt = txt.replace(`s.ios.deployment_target = '13.0'`, `s.ios.deployment_target = '14.0'`);
+  txt = txt.replace(`s.ios.deployment_target = '14.0'`, `s.ios.deployment_target = '15.0'`);
   writeFileSync(podspecFile, txt, { encoding: 'utf-8' });
 }
 
@@ -280,21 +309,116 @@ async function updateBuildGradle(
       }
     }
   }
-  gradleFile = setAllStringIn(
-    gradleFile,
-    `ext.kotlin_version = `,
-    `\n`,
-    `project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`,
-  );
 
+  const kotlinRegex = /ext\.kotlin_version\s*=\s*(?:project\.hasProperty\("kotlin_version"\)\s*\?\s*rootProject\.ext\.kotlin_version\s*:\s*)?['"]([^'"]+)['"]/;
+  gradleFile = gradleFile.replace(kotlinRegex, () => {
+    logger.info(`Set kotlin_version = ${kotlinVersion}.`);
+    return `ext.kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`;
+  });
+
+  const blockKotlinRegex = /ext\s*\{[\s\S]*?\}/gm;
+  gradleFile = gradleFile.replace(blockKotlinRegex, (block) => {
+    return block.replace(
+      /kotlin_version\s*=\s*['"][^'"]+['"]|kotlin_version\s*=\s*project\.hasProperty\("kotlin_version"\)\s*\?\s*rootProject\.ext\.kotlin_version\s*:\s*['"][^'"]+['"]/,
+      `kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`,
+    );
+  });
+
+  const hasKotlinVersion = gradleFile.includes('kotlin_version');
+  const versionToUse = hasKotlinVersion ? '$kotlin_version' : kotlinVersion;
   gradleFile = setAllStringIn(
     gradleFile,
     `implementation "org.jetbrains.kotlin:kotlin-stdlib`,
     `"`,
-    `:$kotlin_version`,
+    `:${versionToUse}`,
   );
 
+  gradleFile = setAllStringIn(
+    gradleFile,
+    `classpath "org.jetbrains.kotlin:kotlin-gradle-plugin`,
+    `"`,
+    `:${versionToUse}`,
+  );
+
+  gradleFile = updateDeprecatedPropertySyntax(gradleFile);
+  gradleFile = updateKotlinOptions(gradleFile);
+
   writeFileSync(filename, gradleFile, 'utf-8');
+}
+
+function updateDeprecatedPropertySyntax(gradleFile: string): string {
+  const propertiesToUpdate = [
+    'namespace',
+    'compileSdk',
+    'url',
+    'abortOnError',
+  ];
+
+  let result = gradleFile;
+
+  for (const prop of propertiesToUpdate) {
+    const regex = new RegExp(`\\b(${prop})[ \\t]+([^=\\t{:])`, 'g');
+    result = result.replace(regex, '$1 = $2');
+  }
+
+  return result;
+}
+
+function updateKotlinOptions(gradleFile: string): string {
+  const kotlinOptionsRegex = /kotlinOptions\s*\{\s*jvmTarget\s*=\s*['"](\d+\.?\d*)['"][\s\S]*?\}/;
+  const match = kotlinOptionsRegex.exec(gradleFile);
+
+  if (!match) {
+    return gradleFile;
+  }
+
+  const jvmTargetValue = `JVM_21`;
+
+  let result = gradleFile;
+
+  if (!result.includes('import org.jetbrains.kotlin.gradle.dsl.JvmTarget')) {
+    const firstNonCommentLine = result.split('\n').findIndex((line) => {
+      if (!line) return false;
+      const trimmed = line.trim();
+      return trimmed.length > 0 && !trimmed.startsWith('//') && !trimmed.startsWith('/*');
+    });
+    const lines = result.split('\n');
+    if (firstNonCommentLine >= 0) {
+      lines.splice(firstNonCommentLine, 0, 'import org.jetbrains.kotlin.gradle.dsl.JvmTarget', '');
+      result = lines.join('\n');
+    }
+  }
+
+  result = result.replace(/\n\s*kotlinOptions\s*\{[\s\S]*?\}\s*\n/g, '\n'); 
+
+  const kotlinBlockRegex = /\nkotlin\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/;
+  const kotlinBlockMatch = kotlinBlockRegex.exec(result);
+
+  const compilerOptionsBlock = `    compilerOptions {\n        jvmTarget = JvmTarget.${jvmTargetValue}\n    }`;
+
+  if (kotlinBlockMatch) {
+    // Kotlin block exists, add compilerOptions to it if not already present
+    if (!kotlinBlockMatch[0].includes('compilerOptions')) {
+      const kotlinBlockContent = kotlinBlockMatch[1];
+      const existingContent = kotlinBlockContent.trimEnd();
+      const newKotlinBlock = `\nkotlin {${existingContent}\n${compilerOptionsBlock}\n}`;
+      result = result.replace(kotlinBlockRegex, newKotlinBlock);
+    }
+  } else {
+    // No kotlin block exists, create one after the android block
+    const androidBlockRegex = /android\s*\{[\s\S]*?\n\}/;
+    const androidMatch = androidBlockRegex.exec(result);
+
+    if (androidMatch) {
+      const insertPosition = androidMatch.index + androidMatch[0].length;
+      const kotlinBlock = `\n\nkotlin {\n${compilerOptionsBlock}\n}`;
+      result = result.slice(0, insertPosition) + kotlinBlock + result.slice(insertPosition);
+    }
+  }
+
+  logger.info('Updated kotlinOptions to compilerOptions for Kotlin 2');
+
+  return result;
 }
 
 function readFile(filename: string): string | undefined {
