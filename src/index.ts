@@ -14,11 +14,11 @@ import { rimraf } from 'rimraf';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '8.0.0';
-const gradleVersion = '8.14.3';
-const AGPVersion = '8.13.0';
-const gmsVersion = '4.4.4';
-const kotlinVersion = '2.2.20';
+const coreVersion = '9.0.0-alpha.5';
+const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
+const gradleVersion = '9.5.1';
+const AGPVersion = '9.2.1';
+const gmsVersion = '4.5.0';
 const docgenVersion = '^0.3.1';
 const eslintVersion = '^8.57.1';
 const ionicEslintVersion = '^0.4.0';
@@ -30,15 +30,15 @@ const rimrafVersion = '^6.1.0';
 const rollupVersion = '^4.53.2';
 const typesNodeVersion = '^24.10.1';
 const typeScriptVersion = '^5.9.3';
+const iOSVersion = '16';
 let updatePrettierJava = false;
 const variables = {
-  minSdkVersion: 24,
-  compileSdkVersion: 36,
-  targetSdkVersion: 36,
-  androidxActivityVersion: '1.11.0',
+  minSdkVersion: 26,
+  compileSdkVersion: 37,
+  androidxActivityVersion: '1.13.0',
   androidxAppCompatVersion: '1.7.1',
   androidxCoordinatorLayoutVersion: '1.3.0',
-  androidxCoreVersion: '1.17.0',
+  androidxCoreVersion: '1.19.0',
   androidxFragmentVersion: '1.8.9',
   firebaseMessagingVersion: '25.0.1',
   playServicesLocationVersion: '21.3.0',
@@ -46,11 +46,10 @@ const variables = {
   androidxMaterialVersion: '1.13.0',
   androidxExifInterfaceVersion: '1.4.1',
   coreSplashScreenVersion: '1.2.0',
-  androidxWebkitVersion: '1.14.0',
+  androidxWebkitVersion: '1.16.0',
   junitVersion: '4.13.2',
   androidxJunitVersion: '1.3.0',
   androidxEspressoCoreVersion: '3.7.0',
-  androidxCoreKTXVersion: '1.17.0',
   googleMapsPlayServicesVersion: '19.2.0',
   googleMapsUtilsVersion: '3.19.1',
   googleMapsKtxVersion: '5.2.1',
@@ -74,10 +73,10 @@ export const run = async (): Promise<void> => {
 
   for (const dep of ['@capacitor/ios', '@capacitor/android', '@capacitor/core', '@capacitor/cli']) {
     if (pluginJSON.devDependencies?.[dep]) {
-      pluginJSON.devDependencies[dep] = `^${coreVersion}`;
+      pluginJSON.devDependencies[dep] = coreNPMVersion;
     }
     if (pluginJSON.dependencies?.[dep]) {
-      pluginJSON.dependencies[dep] = `^${coreVersion}`;
+      pluginJSON.dependencies[dep] = coreNPMVersion;
     }
     if (pluginJSON.peerDependencies?.[dep]) {
       pluginJSON.peerDependencies[dep] = `>=${coreVersion}`;
@@ -219,21 +218,25 @@ export const run = async (): Promise<void> => {
         join(iosDir, 'Plugin.xcodeproj', 'project.pbxproj'),
         'IPHONEOS_DEPLOYMENT_TARGET = ',
         ';',
-        '15.0',
+        `${iOSVersion}.0`,
       );
-      await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, '15.0');
-      await updateFile(join(dir, 'Package.swift'), '[.iOS(.v', ')],', '15');
+      const packageSwift = join(dir, 'Package.swift');
+      await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, `${iOSVersion}.0`);
+      await updateFile(packageSwift, '[.iOS(.v', ')],', iOSVersion);
       await updateFile(
-        join(dir, 'Package.swift'),
+        packageSwift,
         '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git",',
         ')',
         ` from: "${coreVersion}"`,
       );
+      let packageSwiftText = readFileSync(packageSwift, 'utf-8');
+      packageSwiftText = packageSwiftText.replace(/^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m, '');
+      writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
       await updatePodspec(dir, pluginJSON);
     }
   }
 
-  logger.info('Plugin migrated to Capacitor 8!');
+  logger.info('Plugin migrated to Capacitor 9!');
 
   if (prettierUpdatedFromV2) {
     logger.info('');
@@ -249,7 +252,8 @@ function updatePodspec(dir: string, pluginJSON: any) {
     return false;
   }
   txt = txt.replace('s.ios.deployment_target  =', 's.ios.deployment_target =');
-  txt = txt.replace(`s.ios.deployment_target = '14.0'`, `s.ios.deployment_target = '15.0'`);
+  const prevIOS = Number(iOSVersion)-1;
+  txt = txt.replace(`s.ios.deployment_target = '${prevIOS}.0'`, `s.ios.deployment_target = '${iOSVersion}.0'`);
   writeFileSync(podspecFile, txt, { encoding: 'utf-8' });
 }
 
@@ -267,6 +271,8 @@ async function updateBuildGradle(
   }
   gradleFile = gradleFile.replaceAll(' =  ', ' = ');
   logger.info('Updating build.gradle');
+  gradleFile = gradleFile.replaceAll('androidxCoreKTXVersion', 'androidxCoreVersion');
+
   gradleFile = setAllStringIn(gradleFile, `sourceCompatibility JavaVersion.`, `\n`, `VERSION_21`);
   gradleFile = setAllStringIn(gradleFile, `targetCompatibility JavaVersion.`, `\n`, `VERSION_21`);
 
@@ -310,38 +316,19 @@ async function updateBuildGradle(
     }
   }
 
-  const kotlinRegex = /ext\.kotlin_version\s*=\s*(?:project\.hasProperty\("kotlin_version"\)\s*\?\s*rootProject\.ext\.kotlin_version\s*:\s*)?['"]([^'"]+)['"]/;
-  gradleFile = gradleFile.replace(kotlinRegex, () => {
-    logger.info(`Set kotlin_version = ${kotlinVersion}.`);
-    return `ext.kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`;
-  });
-
-  const blockKotlinRegex = /ext\s*\{[\s\S]*?\}/gm;
-  gradleFile = gradleFile.replace(blockKotlinRegex, (block) => {
-    return block.replace(
-      /kotlin_version\s*=\s*['"][^'"]+['"]|kotlin_version\s*=\s*project\.hasProperty\("kotlin_version"\)\s*\?\s*rootProject\.ext\.kotlin_version\s*:\s*['"][^'"]+['"]/,
-      `kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '${kotlinVersion}'`,
-    );
-  });
-
-  const hasKotlinVersion = gradleFile.includes('kotlin_version');
-  const versionToUse = hasKotlinVersion ? '$kotlin_version' : kotlinVersion;
-  gradleFile = setAllStringIn(
-    gradleFile,
-    `implementation "org.jetbrains.kotlin:kotlin-stdlib`,
-    `"`,
-    `:${versionToUse}`,
-  );
-
-  gradleFile = setAllStringIn(
-    gradleFile,
-    `classpath "org.jetbrains.kotlin:kotlin-gradle-plugin`,
-    `"`,
-    `:${versionToUse}`,
-  );
-
   gradleFile = updateDeprecatedPropertySyntax(gradleFile);
   gradleFile = updateKotlinOptions(gradleFile);
+  gradleFile = gradleFile.replace(/^\s*ext\.kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '\d+\.\d+\.\d+'\n?/m, '');
+  gradleFile = gradleFile.replace(/^\s*ext \{\n\s*kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '[\d.]+'\n\s*\}\n?/gm, '');
+  gradleFile = gradleFile.replace(/^\s*classpath "org\.jetbrains\.kotlin:kotlin-gradle-plugin:\$kotlin_version"\n?/m, '');
+  gradleFile = gradleFile.replace(`apply plugin: 'kotlin-android'\n`,'');
+  gradleFile = gradleFile.replace(`apply plugin: 'org.jetbrains.kotlin.android'\n`, '');
+  gradleFile = gradleFile.replace(/^\s*implementation "org\.jetbrains\.kotlin:kotlin-stdlib:\$kotlin_version"\n?/gm, '')
+  gradleFile = gradleFile.replace(/^\s*targetSdkVersion project\.hasProperty\('targetSdkVersion'\) \? rootProject\.ext\.targetSdkVersion : \d+\n?/m, '');
+  gradleFile = gradleFile.replace(`implementation "androidx.core:core-ktx:$androidxCoreVersion"`, `implementation "androidx.core:core:$androidxCoreVersion"`)
+  if (gradleFile.includes(`androidx.core:core-ktx:1`)) {
+    gradleFile = setAllStringIn(gradleFile, `androidx.core:core`, `'`, `:${variables.androidxCoreVersion}`)
+  }
 
   writeFileSync(filename, gradleFile, 'utf-8');
 }
