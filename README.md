@@ -1,9 +1,9 @@
 # Migrate Capacitor Plugin
 
-Migrate a Capacitor 7 plugin to Capacitor 8.
+Migrate a Capacitor 8 plugin to Capacitor 9.
 
 ## Usage
 
 ```
-npx @capacitor/plugin-migration-v7-to-v8@latest
+npx @capacitor/plugin-migration-v8-to-v9@latest
 ```
