@@ -204,6 +204,7 @@ export const run = async (): Promise<void> => {
 
       let gradleText = readFileSync(buildGradle, 'utf-8');
       gradleText = gradleText.replace(/\s*jcenter\(\)/g, '');
+      gradleText = gradleText.replace(`proguard-android.txt`, `proguard-android-optimize.txt`);
       writeFileSync(buildGradle, gradleText, { encoding: 'utf-8' });
 
       // gradle.properties
