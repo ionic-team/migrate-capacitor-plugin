@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "npm run eslint && npm run prettier -- --check",
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write",
-    "eslint": "eslint . --ext ts",
+    "eslint": "eslint .",
     "prettier": "prettier \"**/*.{css,html,js,mjs,ts,json}\"",
     "build": "npm run clean && tsc",
     "clean": "rimraf ./dist",
@@ -30,19 +30,17 @@
   "author": "Ionic Team <hi@ionicframework.com>",
   "license": "MIT",
   "prettier": "@ionic/prettier-config",
-  "eslintConfig": {
-    "extends": "@ionic/eslint-config/recommended"
-  },
   "bugs": {
     "url": "https://github.com/ionic-team/migrate-capacitor-plugin/issues"
   },
   "homepage": "https://github.com/ionic-team/migrate-capacitor-plugin#readme",
   "devDependencies": {
-    "@ionic/eslint-config": "^0.4.0",
+    "@ionic/eslint-config": "^1.0.0",
     "@ionic/prettier-config": "^4.0.0",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^24.10.1",
-    "eslint": "^8.57.0",
+    "@types/semver": "^7.7.1",
+    "eslint": "^10.0.0",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3"
   },

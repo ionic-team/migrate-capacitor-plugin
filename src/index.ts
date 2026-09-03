@@ -20,9 +20,34 @@ const gradleVersion = '9.5.1';
 const AGPVersion = '9.2.1';
 const gmsVersion = '4.5.0';
 const docgenVersion = '^0.3.1';
-const eslintVersion = '^8.57.1';
-const ionicEslintVersion = '^0.4.0';
+const eslintVersion = '^10.0.0';
+const ionicEslintVersion = '^1.0.0';
 const ionicPrettierVersion = '^4.0.0';
+
+const eslintConfigCjs = `const ionic = require('@ionic/eslint-config/recommended');
+
+module.exports = [
+  {
+    ignores: [
+      '**/build/**',
+      '**/dist/**',
+      'example-app/**',
+      // lint TypeScript only
+      '**/*.js',
+      '**/*.mjs',
+      '**/*.cjs',
+    ],
+  },
+  ...ionic,
+  {
+    files: ['**/*.ts'],
+    rules: {
+      // underscore-prefixed parameters are intentionally unused (interface signatures)
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+];
+`;
 const ionicSwiftlintVersion = '^2.0.0';
 const prettierJavaVersion = '^2.7.7';
 const prettierVersion = '^3.6.2';
@@ -99,11 +124,17 @@ export const run = async (): Promise<void> => {
       pluginJSON.peerDependencies[dep] = `>=${coreVersion}`;
     }
   }
+  let eslintUpdated = false;
   if (pluginJSON.devDependencies?.['@ionic/eslint-config']) {
     pluginJSON.devDependencies['@ionic/eslint-config'] = ionicEslintVersion;
     if (pluginJSON.devDependencies?.['eslint']) {
       pluginJSON.devDependencies['eslint'] = eslintVersion;
     }
+    delete pluginJSON.eslintConfig;
+    if (pluginJSON.scripts?.['eslint']) {
+      pluginJSON.scripts['eslint'] = pluginJSON.scripts['eslint'].replace(' --ext ts', '');
+    }
+    eslintUpdated = true;
   }
   if (pluginJSON.devDependencies?.['@ionic/swiftlint-config']) {
     pluginJSON.devDependencies['@ionic/swiftlint-config'] = ionicSwiftlintVersion;
@@ -182,6 +213,16 @@ export const run = async (): Promise<void> => {
 
   writeFileSync(packageJson, packageJsonText, 'utf-8');
 
+  if (eslintUpdated) {
+    const eslintIgnore = join(dir, '.eslintignore');
+    if (existsSync(eslintIgnore)) {
+      removeSync(eslintIgnore);
+    }
+    if (!['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs'].some((file) => existsSync(join(dir, file)))) {
+      writeFileSync(join(dir, 'eslint.config.cjs'), eslintConfigCjs, 'utf-8');
+    }
+  }
+
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
@@ -190,7 +231,7 @@ export const run = async (): Promise<void> => {
       ...opts,
       cwd: dir,
     });
-  } catch (e: any) {
+  } catch {
     logger.warn('npm install failed, please, install the dependencies using your package manager of choice');
   }
 
@@ -267,6 +308,13 @@ export const run = async (): Promise<void> => {
   }
 
   logger.info('Plugin migrated to Capacitor 9!');
+
+  if (eslintUpdated) {
+    logger.info('');
+    logger.info('⚠️  Note: ESLint has been updated to v10 and @ionic/eslint-config to v1, which uses flat config.');
+    logger.info('An eslint.config.cjs file was added; .eslintignore and the eslintConfig block in package.json were removed.');
+    logger.info('Running lint may surface new reports; see https://github.com/ionic-team/eslint-config#migrating-from-0x');
+  }
 
   if (prettierUpdatedFromV2) {
     logger.info('');
