@@ -10,6 +10,7 @@ import {
 } from 'fs-extra';
 import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
+import { coerce, gte, lt, valid } from 'semver';
 
 import { logger } from './log';
 import { runCommand } from './subprocess';
@@ -128,9 +129,8 @@ export const run = async (): Promise<void> => {
   if (pluginJSON.devDependencies?.['@ionic/prettier-config']) {
     const existingPrettierVersion = pluginJSON.devDependencies?.['prettier'];
     if (existingPrettierVersion) {
-      const semver = await import('semver');
-      const cleanVersion = semver.coerce(existingPrettierVersion);
-      if (cleanVersion && semver.lt(cleanVersion, '3.0.0')) {
+      const cleanVersion = coerce(existingPrettierVersion);
+      if (cleanVersion && lt(cleanVersion, '3.0.0')) {
         prettierUpdatedFromV2 = true;
       }
     }
@@ -209,24 +209,37 @@ export const run = async (): Promise<void> => {
 
       // gradle.properties
       await updateGradleProperties(join(androidDir, 'gradle.properties'));
+      const gradleWrapperPath = join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties');
 
-      await runCommand(
-        './gradlew',
-        ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
-        {
-          ...opts,
-          cwd: androidDir,
-        },
-      );
-      // run twice as first run only updates the properties file
-      await runCommand(
-        './gradlew',
-        ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
-        {
-          ...opts,
-          cwd: androidDir,
-        },
-      );
+      const gradleWrapperVersion = getGradleWrapperVersion(gradleWrapperPath);
+      const outdatedGradle = gte(gradleVersion, gradleWrapperVersion);
+
+      if (outdatedGradle) {
+        await updateFile(
+          gradleWrapperPath,
+          'services.gradle.org/distributions/gradle-',
+          '.zip',
+          `${gradleVersion}-all`,
+        );
+
+        await runCommand(
+          './gradlew',
+          ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
+          {
+            ...opts,
+            cwd: androidDir,
+          },
+        );
+        // run twice as first run only updates the properties file
+        await runCommand(
+          './gradlew',
+          ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
+          {
+            ...opts,
+            cwd: androidDir,
+          },
+        );
+      }
 
       const variablesAndClasspaths = {
         variables: variables,
@@ -341,10 +354,9 @@ async function updateBuildGradle(
 
   for (const dep of Object.keys(neededDeps)) {
     if (gradleFile.includes(`classpath '${dep}`)) {
-      const semver = await import('semver');
       const firstIndex = gradleFile.indexOf(dep) + dep.length + 1;
       const existingVersion = '' + gradleFile.substring(firstIndex, gradleFile.indexOf("'", firstIndex));
-      if (semver.gte(neededDeps[dep], existingVersion)) {
+      if (gte(neededDeps[dep], existingVersion)) {
         gradleFile = setAllStringIn(gradleFile, `classpath '${dep}:`, `'`, neededDeps[dep]);
         logger.info(`Set ${dep} = ${neededDeps[dep]}.`);
       }
@@ -361,12 +373,11 @@ async function updateBuildGradle(
       endString = '\n';
     }
     if (gradleFile.includes(depString) && typeof depValueString === 'string') {
-      const semver = await import('semver');
       const firstIndex = gradleFile.indexOf(depString) + depString.length;
       const existingVersion = '' + gradleFile.substring(firstIndex, gradleFile.indexOf(endString, firstIndex));
       if (
-        (semver.valid(depValueString) && semver.gte(depValueString, existingVersion)) ||
-        (!semver.valid(depValueString) && (depValue as number) > Number(existingVersion))
+        (valid(depValueString) && gte(depValueString, existingVersion)) ||
+        (!valid(depValueString) && (depValue as number) > Number(existingVersion))
       ) {
         gradleFile = setAllStringIn(gradleFile, depString, endString, depValueString);
         logger.info(`Set ${dep} = ${depValueString}.`);
@@ -561,4 +572,14 @@ async function updateFile(
   }
 
   return false;
+}
+
+function getGradleWrapperVersion(filename: string): string {
+  const txt = readFile(filename);
+  if (!txt) {
+    return '0.0.0';
+  }
+  const version = txt.substring(txt.indexOf('gradle-') + 7, txt.indexOf('-all.zip'));
+  const semverVersion = coerce(version)?.version;
+  return semverVersion ? semverVersion : '0.0.0';
 }
