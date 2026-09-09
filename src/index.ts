@@ -21,7 +21,7 @@ const AGPVersion = '9.2.1';
 const gmsVersion = '4.5.0';
 const docgenVersion = '^0.3.1';
 const eslintVersion = '^10.0.0';
-const ionicEslintVersion = '^1.0.0';
+const ionicEslintVersion = '^0.5.0';
 const ionicPrettierVersion = '^4.0.0';
 
 // Flat config has no equivalent of .eslintignore, so its entries move into the config.
@@ -305,7 +305,7 @@ export const run = async (): Promise<void> => {
     logger.info('');
     logger.info('⚠️  Note: ESLint has been updated to v10 and @ionic/eslint-config to v1, which uses flat config.');
     logger.info('An eslint.config.cjs file was added; .eslintignore and the eslintConfig block in package.json were removed.');
-    logger.info('Running lint may surface new reports; see https://github.com/ionic-team/eslint-config#migrating-from-0x');
+    logger.info('Running lint may surface new reports; see https://github.com/ionic-team/eslint-config#migrating-from-04-or-earlier');
   }
 
   if (prettierUpdatedFromV2) {
