@@ -32,6 +32,7 @@ const rollupVersion = '^4.53.2';
 const typesNodeVersion = '^24.10.1';
 const typeScriptVersion = '^5.9.3';
 const iOSVersion = '16';
+const capacitorPackageURL = 'https://github.com/ionic-team/capacitor';
 let updatePrettierJava = false;
 const variables = {
   minSdkVersion: 26,
@@ -263,18 +264,7 @@ export const run = async (): Promise<void> => {
       const packageSwift = join(dir, 'Package.swift');
       await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, `${iOSVersion}.0`);
       await updateFile(packageSwift, '[.iOS(.v', ')],', iOSVersion);
-      await updateFile(
-        packageSwift,
-        '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git",',
-        ')',
-        ` from: "${coreVersion}"`,
-      );
-      let packageSwiftText = readFileSync(packageSwift, 'utf-8');
-      packageSwiftText = packageSwiftText.replace(
-        /^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m,
-        '',
-      );
-      writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
+      updateCapacitorPackage(packageSwift);
       await updatePodspec(dir, pluginJSON);
     }
   }
@@ -314,6 +304,36 @@ function removeAGPMigrationProperties(txt: string): string {
       return false;
     })
     .join('\n');
+}
+
+// Matches the whole entry whichever requirement style it uses, including a nested one such as
+// .upToNextMajor(from:), and whether it points at capacitor-swift-pm or the source package already.
+const capacitorDependency = /^([ \t]*)\.package\([^\n]*capacitor(?:-swift-pm)?(?:\.git)?"[^\n]*\)/m;
+const cordovaProduct = /^[ \t]*\.product\(name: "(?:Cordova|CapacitorCordova)", package: "capacitor"\),[ \t]*\n/gm;
+// A last entry has to take the preceding comma with it, or it leaves one dangling before the ].
+const lastCordovaProduct = /,[ \t]*\n[ \t]*\.product\(name: "(?:Cordova|CapacitorCordova)", package: "capacitor"\)/g;
+
+function updateCapacitorPackage(packageSwift: string) {
+  const txt = readFile(packageSwift);
+  if (!txt) {
+    return;
+  }
+
+  if (!capacitorDependency.test(txt)) {
+    logger.warn(`Unable to find a Capacitor dependency in ${packageSwift}. Try updating it manually`);
+    return;
+  }
+
+  const migrated = txt
+    .replace(capacitorDependency, `$1.package(url: "${capacitorPackageURL}", from: "${coreVersion}")`)
+    .replaceAll('package: "capacitor-swift-pm"', 'package: "capacitor"')
+    .replace(cordovaProduct, '')
+    .replace(lastCordovaProduct, '');
+
+  if (migrated !== txt) {
+    logger.info('Updating Package.swift to the source based Capacitor package');
+    writeFileSync(packageSwift, migrated, { encoding: 'utf-8' });
+  }
 }
 
 function updatePodspec(dir: string, pluginJSON: any) {
