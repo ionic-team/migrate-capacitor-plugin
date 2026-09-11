@@ -274,7 +274,7 @@ export const run = async (): Promise<void> => {
         /^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m,
         '',
       );
-      packageSwiftText = packageSwiftText.replaceAll("capacitor-swift-pm", "capacitor");
+      packageSwiftText = packageSwiftText.replaceAll('capacitor-swift-pm', 'capacitor');
       writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
       await updatePodspec(dir, pluginJSON);
     }
