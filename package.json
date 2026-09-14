@@ -1,6 +1,6 @@
 {
   "name": "@capacitor/plugin-migration-v8-to-v9",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Utility to help migrate Capacitor 8 plugins to Capacitor 9",
   "main": "./dist/index.js",
   "scripts": {
