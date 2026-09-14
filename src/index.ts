@@ -15,7 +15,7 @@ import { coerce, gte, lt, valid } from 'semver';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '9.0.0-alpha.5';
+const coreVersion = '9.0.0-alpha.7';
 const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
 const gradleVersion = '9.5.1';
 const AGPVersion = '9.2.1';
@@ -274,6 +274,7 @@ export const run = async (): Promise<void> => {
         /^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m,
         '',
       );
+      packageSwiftText = packageSwiftText.replaceAll('capacitor-swift-pm', 'capacitor');
       writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
       await updatePodspec(dir, pluginJSON);
     }
