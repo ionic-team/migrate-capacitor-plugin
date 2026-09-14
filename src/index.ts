@@ -10,11 +10,12 @@ import {
 } from 'fs-extra';
 import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
+import { coerce, gte, lt, valid } from 'semver';
 
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '9.0.0-alpha.5';
+const coreVersion = '9.0.0-alpha.7';
 const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
 const gradleVersion = '9.5.1';
 const AGPVersion = '9.2.1';
@@ -100,6 +101,23 @@ const variables = {
   kotlinxCoroutinesVersion: '1.11.0',
 };
 
+// AGP 9 changed the defaults of these properties and Android Studio's AGP Upgrade Assistant
+// writes them into gradle.properties as compatibility shims. Capacitor apps need none of them,
+// most are deprecated and will be removed in AGP 10, and some (android.builtInKotlin,
+// android.sdk.defaultTargetSdkToCompileSdkIfUnset) break a Capacitor 9 build.
+const agpMigrationAssistantProperties = [
+  'android.builtInKotlin',
+  'android.defaults.buildfeatures.resvalues',
+  'android.dependency.useConstraints',
+  'android.enableAppCompileTimeRClass',
+  'android.newDsl',
+  'android.r8.optimizedResourceShrinking',
+  'android.r8.strictFullModeForKeepRules',
+  'android.sdk.defaultTargetSdkToCompileSdkIfUnset',
+  'android.uniquePackageNames',
+  'android.usesSdkInManifest.disallowed',
+];
+
 process.on('unhandledRejection', (error) => {
   process.stderr.write(`ERR: ${error}\n`);
   process.exit(1);
@@ -160,9 +178,8 @@ export const run = async (): Promise<void> => {
   if (pluginJSON.devDependencies?.['@ionic/prettier-config']) {
     const existingPrettierVersion = pluginJSON.devDependencies?.['prettier'];
     if (existingPrettierVersion) {
-      const semver = await import('semver');
-      const cleanVersion = semver.coerce(existingPrettierVersion);
-      if (cleanVersion && semver.lt(cleanVersion, '3.0.0')) {
+      const cleanVersion = coerce(existingPrettierVersion);
+      if (cleanVersion && lt(cleanVersion, '3.0.0')) {
         prettierUpdatedFromV2 = true;
       }
     }
@@ -246,30 +263,53 @@ export const run = async (): Promise<void> => {
       logger.info('Updating Android files');
 
       logger.info('Updating gradle files');
-      await runCommand(
-        './gradlew',
-        ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
-        {
-          ...opts,
-          cwd: androidDir,
-        },
-      );
-      // run twice as first run only updates the properties file
-      await runCommand(
-        './gradlew',
-        ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
-        {
-          ...opts,
-          cwd: androidDir,
-        },
-      );
+      const buildGradle = join(androidDir, 'build.gradle');
+
+      let gradleText = readFileSync(buildGradle, 'utf-8');
+      gradleText = gradleText.replace(/\s*jcenter\(\)/g, '');
+      gradleText = gradleText.replace(`proguard-android.txt`, `proguard-android-optimize.txt`);
+      writeFileSync(buildGradle, gradleText, { encoding: 'utf-8' });
+
+      // gradle.properties
+      await updateGradleProperties(join(androidDir, 'gradle.properties'));
+      const gradleWrapperPath = join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties');
+
+      const gradleWrapperVersion = getGradleWrapperVersion(gradleWrapperPath);
+      const outdatedGradle = gte(gradleVersion, gradleWrapperVersion);
+
+      if (outdatedGradle) {
+        await updateFile(
+          gradleWrapperPath,
+          'services.gradle.org/distributions/gradle-',
+          '.zip',
+          `${gradleVersion}-all`,
+        );
+
+        await runCommand(
+          './gradlew',
+          ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
+          {
+            ...opts,
+            cwd: androidDir,
+          },
+        );
+        // run twice as first run only updates the properties file
+        await runCommand(
+          './gradlew',
+          ['wrapper', '--distribution-type', 'all', '--gradle-version', gradleVersion, '--warning-mode', 'all'],
+          {
+            ...opts,
+            cwd: androidDir,
+          },
+        );
+      }
 
       const variablesAndClasspaths = {
         variables: variables,
         'com.android.tools.build:gradle': AGPVersion,
         'com.google.gms:google-services': gmsVersion,
       };
-      await updateBuildGradle(join(androidDir, 'build.gradle'), variablesAndClasspaths);
+      await updateBuildGradle(buildGradle, variablesAndClasspaths);
     }
   }
 
@@ -293,7 +333,11 @@ export const run = async (): Promise<void> => {
         ` from: "${coreVersion}"`,
       );
       let packageSwiftText = readFileSync(packageSwift, 'utf-8');
-      packageSwiftText = packageSwiftText.replace(/^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m, '');
+      packageSwiftText = packageSwiftText.replace(
+        /^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m,
+        '',
+      );
+      packageSwiftText = packageSwiftText.replaceAll('capacitor-swift-pm', 'capacitor');
       writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
       await updatePodspec(dir, pluginJSON);
     }
@@ -311,9 +355,37 @@ export const run = async (): Promise<void> => {
   if (prettierUpdatedFromV2) {
     logger.info('');
     logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
-    logger.info('We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.');
+    logger.info(
+      'We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.',
+    );
   }
 };
+
+async function updateGradleProperties(filename: string): Promise<void> {
+  const txt = readFile(filename);
+  if (!txt) {
+    return;
+  }
+
+  const replaced = removeAGPMigrationProperties(txt);
+  if (replaced !== txt) {
+    writeFileSync(filename, replaced, 'utf-8');
+  }
+}
+
+function removeAGPMigrationProperties(txt: string): string {
+  return txt
+    .split('\n')
+    .filter((line) => {
+      const property = line.split('=')[0].trim();
+      if (!agpMigrationAssistantProperties.includes(property)) {
+        return true;
+      }
+      logger.info(`Removed ${property} from gradle.properties.`);
+      return false;
+    })
+    .join('\n');
+}
 
 function updatePodspec(dir: string, pluginJSON: any) {
   const podspecFile = pluginJSON.files.find((file: string) => file.includes('.podspec'));
@@ -322,7 +394,7 @@ function updatePodspec(dir: string, pluginJSON: any) {
     return false;
   }
   txt = txt.replace('s.ios.deployment_target  =', 's.ios.deployment_target =');
-  const prevIOS = Number(iOSVersion)-1;
+  const prevIOS = Number(iOSVersion) - 1;
   txt = txt.replace(`s.ios.deployment_target = '${prevIOS}.0'`, `s.ios.deployment_target = '${iOSVersion}.0'`);
   writeFileSync(podspecFile, txt, { encoding: 'utf-8' });
 }
@@ -353,10 +425,9 @@ async function updateBuildGradle(
 
   for (const dep of Object.keys(neededDeps)) {
     if (gradleFile.includes(`classpath '${dep}`)) {
-      const semver = await import('semver');
       const firstIndex = gradleFile.indexOf(dep) + dep.length + 1;
       const existingVersion = '' + gradleFile.substring(firstIndex, gradleFile.indexOf("'", firstIndex));
-      if (semver.gte(neededDeps[dep], existingVersion)) {
+      if (gte(neededDeps[dep], existingVersion)) {
         gradleFile = setAllStringIn(gradleFile, `classpath '${dep}:`, `'`, neededDeps[dep]);
         logger.info(`Set ${dep} = ${neededDeps[dep]}.`);
       }
@@ -373,12 +444,11 @@ async function updateBuildGradle(
       endString = '\n';
     }
     if (gradleFile.includes(depString) && typeof depValueString === 'string') {
-      const semver = await import('semver');
       const firstIndex = gradleFile.indexOf(depString) + depString.length;
       const existingVersion = '' + gradleFile.substring(firstIndex, gradleFile.indexOf(endString, firstIndex));
       if (
-        (semver.valid(depValueString) && semver.gte(depValueString, existingVersion)) ||
-        (!semver.valid(depValueString) && (depValue as number) > Number(existingVersion))
+        (valid(depValueString) && gte(depValueString, existingVersion)) ||
+        (!valid(depValueString) && (depValue as number) > Number(existingVersion))
       ) {
         gradleFile = setAllStringIn(gradleFile, depString, endString, depValueString);
         logger.info(`Set ${dep} = ${depValueString}.`);
@@ -388,28 +458,49 @@ async function updateBuildGradle(
 
   gradleFile = updateDeprecatedPropertySyntax(gradleFile);
   gradleFile = updateKotlinOptions(gradleFile);
-  gradleFile = gradleFile.replace(/^\s*ext\.kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '\d+\.\d+\.\d+'\n?/m, '');
-  gradleFile = gradleFile.replace(/^\s*ext \{\n\s*kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '[\d.]+'\n\s*\}\n?/gm, '');
-  gradleFile = gradleFile.replace(/^\s*classpath "org\.jetbrains\.kotlin:kotlin-gradle-plugin:\$kotlin_version"\n?/m, '');
-  gradleFile = gradleFile.replace(`apply plugin: 'kotlin-android'\n`,'');
+  gradleFile = gradleFile.replace(
+    /^\s*ext\.kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '\d+\.\d+\.\d+'\n?/m,
+    '',
+  );
+  gradleFile = gradleFile.replace(
+    /^\s*ext \{\n\s*kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '[\d.]+'\n\s*\}\n?/gm,
+    '',
+  );
+  gradleFile = gradleFile.replace(
+    /^\s*classpath "org\.jetbrains\.kotlin:kotlin-gradle-plugin:\$kotlin_version"\n?/m,
+    '',
+  );
+  if (!gradleFile.includes(`project.extensions.findByName('kotlin')`)) {
+    gradleFile = gradleFile.replace(`apply plugin: 'kotlin-android'\n`, '');
+  } else {
+    gradleFile = gradleFile.replace(
+      /\s*if\s*\(\s*project\.extensions\.findByName\('kotlin'\)\s*==\s*null\s*\)\s*\{\s*apply\s+plugin:\s*'kotlin-android'\s*\}*/gm,
+      '',
+    );
+  }
+
   gradleFile = gradleFile.replace(`apply plugin: 'org.jetbrains.kotlin.android'\n`, '');
-  gradleFile = gradleFile.replace(/^\s*implementation "org\.jetbrains\.kotlin:kotlin-stdlib:\$kotlin_version"\n?/gm, '')
-  gradleFile = gradleFile.replace(/^\s*targetSdkVersion project\.hasProperty\('targetSdkVersion'\) \? rootProject\.ext\.targetSdkVersion : \d+\n?/m, '');
-  gradleFile = gradleFile.replace(`implementation "androidx.core:core-ktx:$androidxCoreVersion"`, `implementation "androidx.core:core:$androidxCoreVersion"`)
+  gradleFile = gradleFile.replace(
+    /^\s*implementation "org\.jetbrains\.kotlin:kotlin-stdlib:\$kotlin_version"\n?/gm,
+    '',
+  );
+  gradleFile = gradleFile.replace(
+    /^\s*targetSdkVersion project\.hasProperty\('targetSdkVersion'\) \? rootProject\.ext\.targetSdkVersion : \d+\n?/m,
+    '',
+  );
+  gradleFile = gradleFile.replace(
+    `implementation "androidx.core:core-ktx:$androidxCoreVersion"`,
+    `implementation "androidx.core:core:$androidxCoreVersion"`,
+  );
   if (gradleFile.includes(`androidx.core:core-ktx:1`)) {
-    gradleFile = setAllStringIn(gradleFile, `androidx.core:core`, `'`, `:${variables.androidxCoreVersion}`)
+    gradleFile = setAllStringIn(gradleFile, `androidx.core:core`, `'`, `:${variables.androidxCoreVersion}`);
   }
 
   writeFileSync(filename, gradleFile, 'utf-8');
 }
 
 function updateDeprecatedPropertySyntax(gradleFile: string): string {
-  const propertiesToUpdate = [
-    'namespace',
-    'compileSdk',
-    'url',
-    'abortOnError',
-  ];
+  const propertiesToUpdate = ['namespace', 'compileSdk', 'url', 'abortOnError'];
 
   let result = gradleFile;
 
@@ -446,7 +537,7 @@ function updateKotlinOptions(gradleFile: string): string {
     }
   }
 
-  result = result.replace(/\n\s*kotlinOptions\s*\{[\s\S]*?\}\s*\n/g, '\n'); 
+  result = result.replace(/\n\s*kotlinOptions\s*\{[\s\S]*?\}\s*\n/g, '\n');
 
   const kotlinBlockRegex = /\nkotlin\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/;
   const kotlinBlockMatch = kotlinBlockRegex.exec(result);
@@ -552,4 +643,14 @@ async function updateFile(
   }
 
   return false;
+}
+
+function getGradleWrapperVersion(filename: string): string {
+  const txt = readFile(filename);
+  if (!txt) {
+    return '0.0.0';
+  }
+  const version = txt.substring(txt.indexOf('gradle-') + 7, txt.indexOf('.zip', txt.indexOf('gradle-')));
+  const semverVersion = coerce(version)?.version;
+  return semverVersion ? semverVersion : '0.0.0';
 }
