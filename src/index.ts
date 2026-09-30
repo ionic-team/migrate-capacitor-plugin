@@ -240,7 +240,14 @@ export const run = async (): Promise<void> => {
         removeSync(file);
       }
     }
-    if (!['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs'].some((file) => existsSync(join(dir, file)))) {
+    const flatConfigs = ['js', 'mjs', 'cjs', 'ts', 'mts', 'cts'].map((ext) => `eslint.config.${ext}`);
+    const existingConfig = flatConfigs.find((file) => existsSync(join(dir, file)));
+    if (existingConfig) {
+      // a hand-written flat config may still load the 0.4 eslintrc export through FlatCompat
+      logger.warn(
+        `${existingConfig} already exists and was left as is. @ionic/eslint-config/recommended is now a flat config array, so spread it into the config instead of loading it through FlatCompat.`,
+      );
+    } else {
       writeFileSync(join(dir, 'eslint.config.cjs'), eslintConfigCjsFor(ignores), 'utf-8');
     }
   }
