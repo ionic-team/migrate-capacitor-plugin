@@ -347,9 +347,13 @@ export const run = async (): Promise<void> => {
 
   if (eslintUpdated) {
     logger.info('');
-    logger.info('⚠️  Note: ESLint has been updated to v10 and @ionic/eslint-config to v1, which uses flat config.');
-    logger.info('An eslint.config.cjs file was added; .eslintignore and the eslintConfig block in package.json were removed.');
-    logger.info('Running lint may surface new reports; see https://github.com/ionic-team/eslint-config#migrating-from-04-or-earlier');
+    logger.info('⚠️  Note: ESLint has been updated to v10 and @ionic/eslint-config to v0.5.0, which uses flat config.');
+    logger.info(
+      'An eslint.config.cjs file was added; .eslintignore and the eslintConfig block in package.json were removed.',
+    );
+    logger.info(
+      'Running lint may surface new reports; see https://github.com/ionic-team/eslint-config#migrating-from-04-or-earlier',
+    );
   }
 
   if (prettierUpdatedFromV2) {
