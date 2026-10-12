@@ -145,11 +145,6 @@ export const run = async (): Promise<void> => {
     pluginJSON.devDependencies['@capacitor/docgen'] = docgenVersion;
   }
 
-  if (pluginJSON.scripts?.['prepare']) {
-    delete pluginJSON.scripts['prepare'];
-    logger.info('Removed prepare script from package.json.');
-  }
-
   if (pluginJSON.version?.startsWith('7.')) {
     pluginJSON.version = '8.0.0';
   }
