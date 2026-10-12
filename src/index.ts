@@ -12,6 +12,7 @@ import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 import { coerce, gte, lt, valid } from 'semver';
 
+import { formatBlockedScriptsError, npmSupportsInstallScripts, parseBlockedPackages } from './install-scripts';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
@@ -144,6 +145,11 @@ export const run = async (): Promise<void> => {
     pluginJSON.devDependencies['@capacitor/docgen'] = docgenVersion;
   }
 
+  if (pluginJSON.scripts?.['prepare']) {
+    delete pluginJSON.scripts['prepare'];
+    logger.info('Removed prepare script from package.json.');
+  }
+
   if (pluginJSON.version?.startsWith('7.')) {
     pluginJSON.version = '8.0.0';
   }
@@ -185,12 +191,16 @@ export const run = async (): Promise<void> => {
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
+  let installFailed = false;
+  let blockedPackages: string[] = [];
   try {
     await runCommand('npm', ['install'], {
       ...opts,
       cwd: dir,
     });
+    blockedPackages = await findBlockedInstallScripts(dir);
   } catch (e: any) {
+    installFailed = true;
     logger.warn('npm install failed, please, install the dependencies using your package manager of choice');
   }
 
@@ -280,16 +290,39 @@ export const run = async (): Promise<void> => {
     }
   }
 
-  logger.info('Plugin migrated to Capacitor 9!');
-
   if (prettierUpdatedFromV2) {
     logger.info('');
     logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
     logger.info(
       'We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.',
     );
+    logger.info('');
   }
+
+  if (installFailed) {
+    throw 'The plugin files were migrated, but npm install failed, so the migration is incomplete.\nInstall the dependencies using your package manager of choice.';
+  }
+
+  if (blockedPackages.length > 0) {
+    throw `The plugin files were migrated, but ${formatBlockedScriptsError(blockedPackages)}`;
+  }
+
+  logger.info('Plugin migrated to Capacitor 9!');
 };
+
+async function findBlockedInstallScripts(dir: string): Promise<string[]> {
+  try {
+    const npmVersion = await runCommand('npm', ['--version'], { cwd: dir });
+    if (!npmSupportsInstallScripts(npmVersion)) {
+      return [];
+    }
+
+    const output = await runCommand('npm', ['install-scripts', 'ls', '--json'], { cwd: dir });
+    return parseBlockedPackages(output);
+  } catch {
+    return [];
+  }
+}
 
 async function updateGradleProperties(filename: string): Promise<void> {
   const txt = readFile(filename);
