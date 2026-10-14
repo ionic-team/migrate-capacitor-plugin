@@ -12,7 +12,15 @@ import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 import { coerce, gte, lt, valid } from 'semver';
 
+import {
+  diffBlockedKeys,
+  findInstallScriptKeys,
+  formatBlockedScriptsError,
+  npmSupportsInstallScriptsIn,
+} from './install-scripts';
+import type { CommandRunner } from './install-scripts';
 import { logger } from './log';
+import { declaresOtherPackageManager } from './package-manager';
 import { runCommand } from './subprocess';
 
 const coreVersion = '9.0.0-alpha.7';
@@ -182,16 +190,44 @@ export const run = async (): Promise<void> => {
 
   writeFileSync(packageJson, packageJsonText, 'utf-8');
 
+  const runInDir: CommandRunner = (command, args) => runCommand(command, args, { cwd: dir });
+
+  // Take the baseline before anything is removed or reinstalled: `npm install-scripts ls`
+  // enumerates the tree on disk, so this is the last point at which it still reports what was
+  // already pending before this migration started.
+  const supportsInstallScripts = await npmSupportsInstallScriptsIn(runInDir);
+  const baselineBlocked = supportsInstallScripts ? await findInstallScriptKeys(runInDir) : null;
+  if (supportsInstallScripts && baselineBlocked === null) {
+    logger.warn('Could not read the blocked install scripts of this plugin, skipping the check');
+  }
+
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
+  let installError: string | undefined;
+  let blockedPackages: string[] = [];
   try {
     await runCommand('npm', ['install'], {
       ...opts,
       cwd: dir,
     });
+    if (baselineBlocked !== null) {
+      const blockedAfterInstall = await findInstallScriptKeys(runInDir);
+      if (blockedAfterInstall === null) {
+        logger.warn('Could not read the blocked install scripts after installing, skipping the check');
+      } else {
+        // Only report what this migration made pending. Packages that were already pending
+        // are the repo's own allowScripts policy, not something the migration broke.
+        blockedPackages = diffBlockedKeys(baselineBlocked, blockedAfterInstall);
+      }
+    }
   } catch (e: any) {
     logger.warn('npm install failed, please, install the dependencies using your package manager of choice');
+    // A repo that declares pnpm, yarn or bun fails `npm install` on purpose, so that is not
+    // evidence of an incomplete migration.
+    if (!declaresOtherPackageManager(pluginJSON)) {
+      installError = String(e);
+    }
   }
 
   if (pluginJSON.capacitor?.android?.src) {
@@ -280,15 +316,24 @@ export const run = async (): Promise<void> => {
     }
   }
 
-  logger.info('Plugin migrated to Capacitor 9!');
-
   if (prettierUpdatedFromV2) {
     logger.info('');
     logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
     logger.info(
       'We recommend running your formatting and linting scripts to ensure your codebase is formatted correctly.',
     );
+    logger.info('');
   }
+
+  if (installError) {
+    throw `The plugin files were migrated, but npm install failed, so the migration is incomplete.\nInstall the dependencies using your package manager of choice.\nThe migration itself does not need to be run again.\n\nnpm install said:\n${installError}`;
+  }
+
+  if (blockedPackages.length > 0) {
+    throw `The plugin files were migrated, but ${formatBlockedScriptsError(blockedPackages)}`;
+  }
+
+  logger.info('Plugin migrated to Capacitor 9!');
 };
 
 async function updateGradleProperties(filename: string): Promise<void> {
