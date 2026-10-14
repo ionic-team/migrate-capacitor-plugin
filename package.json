@@ -14,7 +14,14 @@
     "prepublishOnly": "npm run build"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": "20 || >=22"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=22.18.0",
+      "onFail": "error"
+    }
   },
   "repository": {
     "type": "git",

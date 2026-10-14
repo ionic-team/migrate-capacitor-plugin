@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.18 is the devEngines floor: the oldest Node with both `node --test`
+        # globs and unflagged TypeScript type stripping.
+        node: ['22.18', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # package-lock.json is gitignored, so `npm ci` is not available here.
+      - run: npm install
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

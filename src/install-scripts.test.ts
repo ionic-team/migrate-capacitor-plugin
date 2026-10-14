@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  diffBlockedKeys,
+  findInstallScriptKeys,
   formatBlockedScriptsError,
   npmSupportsInstallScripts,
+  npmSupportsInstallScriptsIn,
   packageNameFromKey,
   parseBlockedPackages,
 } from './install-scripts.ts';
@@ -78,16 +81,101 @@ describe('parseBlockedPackages', () => {
     assert.deepEqual(parseBlockedPackages(stdout), ['swiftlint@2.1.0']);
   });
 
-  it('returns nothing when no package is blocked', () => {
+  it('returns an empty list when no package is blocked', () => {
     assert.deepEqual(parseBlockedPackages(JSON.stringify({ allowScripts: [] })), []);
+    assert.deepEqual(parseBlockedPackages(JSON.stringify({ allowScripts: [{ name: 'swiftlint' }] })), []);
   });
 
-  it('returns nothing for unexpected or malformed output', () => {
-    assert.deepEqual(parseBlockedPackages('not json'), []);
-    assert.deepEqual(parseBlockedPackages(''), []);
-    assert.deepEqual(parseBlockedPackages(JSON.stringify({})), []);
-    assert.deepEqual(parseBlockedPackages(JSON.stringify({ allowScripts: 'nope' })), []);
-    assert.deepEqual(parseBlockedPackages(JSON.stringify({ allowScripts: [{ name: 'swiftlint' }] })), []);
+  it('returns null for unexpected or malformed output', () => {
+    assert.equal(parseBlockedPackages('not json'), null);
+    assert.equal(parseBlockedPackages(''), null);
+    assert.equal(parseBlockedPackages(JSON.stringify({})), null);
+    assert.equal(parseBlockedPackages(JSON.stringify({ allowScripts: 'nope' })), null);
+  });
+});
+
+describe('findInstallScriptKeys', () => {
+  it('asks npm for the pending list as JSON', async () => {
+    const calls: { command: string; args: readonly string[] }[] = [];
+    const run = async (command: string, args: readonly string[]) => {
+      calls.push({ command, args });
+      return JSON.stringify({
+        allowScripts: [{ name: 'swiftlint', changes: [{ key: 'swiftlint@2.0.0', change: 'pending' }] }],
+      });
+    };
+
+    assert.deepEqual(await findInstallScriptKeys(run), ['swiftlint@2.0.0']);
+    assert.deepEqual(calls, [{ command: 'npm', args: ['install-scripts', 'ls', '--json'] }]);
+  });
+
+  it('returns null when the command fails', async () => {
+    const run = async () => {
+      throw 'Unknown command: "install-scripts"';
+    };
+
+    assert.equal(await findInstallScriptKeys(run), null);
+  });
+
+  it('returns null when the output cannot be parsed', async () => {
+    assert.equal(await findInstallScriptKeys(async () => 'not json'), null);
+  });
+
+  it('distinguishes a determined empty list from a failure', async () => {
+    assert.deepEqual(await findInstallScriptKeys(async () => JSON.stringify({ allowScripts: [] })), []);
+  });
+});
+
+describe('npmSupportsInstallScriptsIn', () => {
+  it('asks npm for its version', async () => {
+    const calls: { command: string; args: readonly string[] }[] = [];
+    const run = async (command: string, args: readonly string[]) => {
+      calls.push({ command, args });
+      return '12.2.0\n';
+    };
+
+    assert.equal(await npmSupportsInstallScriptsIn(run), true);
+    assert.deepEqual(calls, [{ command: 'npm', args: ['--version'] }]);
+  });
+
+  it('is false on npm 11', async () => {
+    assert.equal(await npmSupportsInstallScriptsIn(async () => '11.21.0'), false);
+  });
+
+  it('is false when the command fails', async () => {
+    assert.equal(
+      await npmSupportsInstallScriptsIn(async () => {
+        throw 'npm not found';
+      }),
+      false,
+    );
+  });
+});
+
+describe('diffBlockedKeys', () => {
+  it('ignores a package that was already pending before the migration', () => {
+    const before = ['esbuild@0.25.12'];
+    const after = ['esbuild@0.25.12'];
+
+    assert.deepEqual(diffBlockedKeys(before, after), []);
+  });
+
+  it('reports a package the migration itself installed', () => {
+    const before = ['esbuild@0.25.12'];
+    const after = ['esbuild@0.25.12', 'swiftlint@2.0.0'];
+
+    assert.deepEqual(diffBlockedKeys(before, after), ['swiftlint@2.0.0']);
+  });
+
+  it('reports everything when nothing was pending beforehand', () => {
+    assert.deepEqual(diffBlockedKeys([], ['fsevents@2.3.3', 'swiftlint@2.0.0']), ['fsevents@2.3.3', 'swiftlint@2.0.0']);
+  });
+
+  it('reports a new version of a package that was already pending', () => {
+    assert.deepEqual(diffBlockedKeys(['swiftlint@1.9.0'], ['swiftlint@2.0.0']), ['swiftlint@2.0.0']);
+  });
+
+  it('ignores a package that stopped being pending', () => {
+    assert.deepEqual(diffBlockedKeys(['swiftlint@1.9.0', 'esbuild@0.25.12'], ['esbuild@0.25.12']), []);
   });
 });
 
@@ -120,6 +208,8 @@ describe('formatBlockedScriptsError', () => {
         'Review those packages, then approve and rebuild them:',
         '  npm install-scripts approve fsevents swiftlint',
         '  npm rebuild',
+        '',
+        'The migration itself does not need to be run again.',
       ].join('\n'),
     );
   });
@@ -130,9 +220,16 @@ describe('formatBlockedScriptsError', () => {
     assert.match(message, /^npm blocked the install scripts of 1 package, so/);
   });
 
-  it('lists a package once in the approve command when several versions are blocked', () => {
+  it('counts packages, not versions, when several versions are blocked', () => {
     const message = formatBlockedScriptsError(['esbuild@0.25.12', 'esbuild@0.21.5']);
 
+    assert.match(message, /^npm blocked the install scripts of 1 package, so/);
+    assert.match(message, /^ {2}esbuild@0\.25\.12$/m);
+    assert.match(message, /^ {2}esbuild@0\.21\.5$/m);
     assert.match(message, /^ {2}npm install-scripts approve esbuild$/m);
+  });
+
+  it('tells the user the migration does not need to be re-run', () => {
+    assert.match(formatBlockedScriptsError(['swiftlint@2.0.0']), /does not need to be run again\.$/);
   });
 });

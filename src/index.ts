@@ -12,8 +12,15 @@ import { join, resolve } from 'path';
 import { rimraf } from 'rimraf';
 import { coerce, gte, lt, valid } from 'semver';
 
-import { formatBlockedScriptsError, npmSupportsInstallScripts, parseBlockedPackages } from './install-scripts';
+import {
+  diffBlockedKeys,
+  findInstallScriptKeys,
+  formatBlockedScriptsError,
+  npmSupportsInstallScriptsIn,
+} from './install-scripts';
+import type { CommandRunner } from './install-scripts';
 import { logger } from './log';
+import { declaresOtherPackageManager } from './package-manager';
 import { runCommand } from './subprocess';
 
 const coreVersion = '9.0.0-alpha.7';
@@ -183,20 +190,44 @@ export const run = async (): Promise<void> => {
 
   writeFileSync(packageJson, packageJsonText, 'utf-8');
 
+  const runInDir: CommandRunner = (command, args) => runCommand(command, args, { cwd: dir });
+
+  // Take the baseline before the lockfile and node_modules go away: `npm install-scripts ls`
+  // enumerates through arborist, so once they are gone it can no longer see what was already
+  // pending before this migration started.
+  const supportsInstallScripts = await npmSupportsInstallScriptsIn(runInDir);
+  const baselineBlocked = supportsInstallScripts ? await findInstallScriptKeys(runInDir) : null;
+  if (supportsInstallScripts && baselineBlocked === null) {
+    logger.warn('Could not read the blocked install scripts of this plugin, skipping the check');
+  }
+
   rimraf.sync(join(dir, 'node_modules/@capacitor'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
-  let installFailed = false;
+  let installError: string | undefined;
   let blockedPackages: string[] = [];
   try {
     await runCommand('npm', ['install'], {
       ...opts,
       cwd: dir,
     });
-    blockedPackages = await findBlockedInstallScripts(dir);
+    if (baselineBlocked !== null) {
+      const blockedAfterInstall = await findInstallScriptKeys(runInDir);
+      if (blockedAfterInstall === null) {
+        logger.warn('Could not read the blocked install scripts after installing, skipping the check');
+      } else {
+        // Only report what this migration made pending. Packages that were already pending
+        // are the repo's own allowScripts policy, not something the migration broke.
+        blockedPackages = diffBlockedKeys(baselineBlocked, blockedAfterInstall);
+      }
+    }
   } catch (e: any) {
-    installFailed = true;
     logger.warn('npm install failed, please, install the dependencies using your package manager of choice');
+    // A repo that declares pnpm, yarn or bun fails `npm install` on purpose, so that is not
+    // evidence of an incomplete migration.
+    if (!declaresOtherPackageManager(pluginJSON)) {
+      installError = String(e);
+    }
   }
 
   if (pluginJSON.capacitor?.android?.src) {
@@ -294,8 +325,8 @@ export const run = async (): Promise<void> => {
     logger.info('');
   }
 
-  if (installFailed) {
-    throw 'The plugin files were migrated, but npm install failed, so the migration is incomplete.\nInstall the dependencies using your package manager of choice.';
+  if (installError) {
+    throw `The plugin files were migrated, but npm install failed, so the migration is incomplete.\nInstall the dependencies using your package manager of choice.\nThe migration itself does not need to be run again.\n\nnpm install said:\n${installError}`;
   }
 
   if (blockedPackages.length > 0) {
@@ -304,20 +335,6 @@ export const run = async (): Promise<void> => {
 
   logger.info('Plugin migrated to Capacitor 9!');
 };
-
-async function findBlockedInstallScripts(dir: string): Promise<string[]> {
-  try {
-    const npmVersion = await runCommand('npm', ['--version'], { cwd: dir });
-    if (!npmSupportsInstallScripts(npmVersion)) {
-      return [];
-    }
-
-    const output = await runCommand('npm', ['install-scripts', 'ls', '--json'], { cwd: dir });
-    return parseBlockedPackages(output);
-  } catch {
-    return [];
-  }
-}
 
 async function updateGradleProperties(filename: string): Promise<void> {
   const txt = readFile(filename);
