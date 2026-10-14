@@ -26,8 +26,9 @@ The migration itself does not need to be run again.
 ```
 
 Review each package before approving it. Only packages that this migration made pending
-are reported — anything already covered by your own `allowScripts` policy before the
-migration ran is left alone.
+are reported. A package you had already reviewed before the migration ran — whether you
+approved it or left it blocked — is left alone, even if the migration moved it to a new
+version.
 
 ## Failed installs
 

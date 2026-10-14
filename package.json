@@ -14,12 +14,12 @@
     "prepublishOnly": "npm run build"
   },
   "engines": {
-    "node": "20 || >=22"
+    "node": ">=24.0.0"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": ">=22.18.0",
+      "version": ">=24.0.0",
       "onFail": "error"
     }
   },

@@ -192,9 +192,9 @@ export const run = async (): Promise<void> => {
 
   const runInDir: CommandRunner = (command, args) => runCommand(command, args, { cwd: dir });
 
-  // Take the baseline before the lockfile and node_modules go away: `npm install-scripts ls`
-  // enumerates through arborist, so once they are gone it can no longer see what was already
-  // pending before this migration started.
+  // Take the baseline before anything is removed or reinstalled: `npm install-scripts ls`
+  // enumerates the tree on disk, so this is the last point at which it still reports what was
+  // already pending before this migration started.
   const supportsInstallScripts = await npmSupportsInstallScriptsIn(runInDir);
   const baselineBlocked = supportsInstallScripts ? await findInstallScriptKeys(runInDir) : null;
   if (supportsInstallScripts && baselineBlocked === null) {

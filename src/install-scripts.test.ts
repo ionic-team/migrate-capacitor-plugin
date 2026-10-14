@@ -41,12 +41,12 @@ describe('parseBlockedPackages', () => {
   it('returns the pending keys', () => {
     const stdout = JSON.stringify({
       allowScripts: [
-        { name: 'fsevents', changes: [{ key: 'fsevents@2.3.3', change: 'pending' }] },
+        { name: 'esbuild', changes: [{ key: 'esbuild@0.28.0', change: 'pending' }] },
         { name: 'swiftlint', changes: [{ key: 'swiftlint@2.0.0', change: 'pending' }] },
       ],
     });
 
-    assert.deepEqual(parseBlockedPackages(stdout), ['fsevents@2.3.3', 'swiftlint@2.0.0']);
+    assert.deepEqual(parseBlockedPackages(stdout), ['esbuild@0.28.0', 'swiftlint@2.0.0']);
   });
 
   it('returns every pending version of the same package', () => {
@@ -55,14 +55,14 @@ describe('parseBlockedPackages', () => {
         {
           name: 'esbuild',
           changes: [
-            { key: 'esbuild@0.25.12', change: 'pending' },
-            { key: 'esbuild@0.21.5', change: 'pending' },
+            { key: 'esbuild@0.28.0', change: 'pending' },
+            { key: 'esbuild@0.27.7', change: 'pending' },
           ],
         },
       ],
     });
 
-    assert.deepEqual(parseBlockedPackages(stdout), ['esbuild@0.25.12', 'esbuild@0.21.5']);
+    assert.deepEqual(parseBlockedPackages(stdout), ['esbuild@0.28.0', 'esbuild@0.27.7']);
   });
 
   it('ignores changes that are not pending', () => {
@@ -71,14 +71,14 @@ describe('parseBlockedPackages', () => {
         {
           name: 'swiftlint',
           changes: [
-            { key: 'swiftlint@2.0.0', change: 'approved' },
-            { key: 'swiftlint@2.1.0', change: 'pending' },
+            { key: 'swiftlint@1.0.2', change: 'approved' },
+            { key: 'swiftlint@2.0.0', change: 'pending' },
           ],
         },
       ],
     });
 
-    assert.deepEqual(parseBlockedPackages(stdout), ['swiftlint@2.1.0']);
+    assert.deepEqual(parseBlockedPackages(stdout), ['swiftlint@2.0.0']);
   });
 
   it('returns an empty list when no package is blocked', () => {
@@ -151,31 +151,45 @@ describe('npmSupportsInstallScriptsIn', () => {
   });
 });
 
+// The scenarios below mirror runs against real Capacitor 8 plugins on npm 12.2.0. The
+// migration does not touch esbuild, and node_modules survives it, so an esbuild the author
+// left pending comes back at the same version. swiftlint is the package the migration itself
+// moves, from ^1.0.0 to ^2.0.0.
 describe('diffBlockedKeys', () => {
-  it('ignores a package that was already pending before the migration', () => {
-    const before = ['esbuild@0.25.12'];
-    const after = ['esbuild@0.25.12'];
+  it('ignores a package the migration does not touch', () => {
+    const before = ['esbuild@0.28.0'];
+    const after = ['esbuild@0.28.0'];
 
     assert.deepEqual(diffBlockedKeys(before, after), []);
   });
 
-  it('reports a package the migration itself installed', () => {
-    const before = ['esbuild@0.25.12'];
-    const after = ['esbuild@0.25.12', 'swiftlint@2.0.0'];
+  it('reports a package the migration newly blocked', () => {
+    // swiftlint@1.0.2 was approved, so it is absent from the baseline. The bump to 2.0.0 is
+    // a version the author never reviewed.
+    const before = ['esbuild@0.28.0'];
+    const after = ['esbuild@0.28.0', 'swiftlint@2.0.0'];
 
     assert.deepEqual(diffBlockedKeys(before, after), ['swiftlint@2.0.0']);
   });
 
-  it('reports everything when nothing was pending beforehand', () => {
-    assert.deepEqual(diffBlockedKeys([], ['fsevents@2.3.3', 'swiftlint@2.0.0']), ['fsevents@2.3.3', 'swiftlint@2.0.0']);
+  it('ignores a package the author had already left blocked, bumped to a new version', () => {
+    assert.deepEqual(diffBlockedKeys(['swiftlint@1.0.2'], ['swiftlint@2.0.0']), []);
   });
 
-  it('reports a new version of a package that was already pending', () => {
-    assert.deepEqual(diffBlockedKeys(['swiftlint@1.9.0'], ['swiftlint@2.0.0']), ['swiftlint@2.0.0']);
+  it('reports everything when nothing was pending beforehand', () => {
+    // A fresh clone has no node_modules, so npm reports an empty pending set as the baseline.
+    assert.deepEqual(diffBlockedKeys([], ['esbuild@0.28.0', 'swiftlint@2.0.0']), ['esbuild@0.28.0', 'swiftlint@2.0.0']);
+  });
+
+  it('matches a scoped package by name', () => {
+    const before = ['@swc/core@1.16.17'];
+    const after = ['@swc/core@1.16.18', 'swiftlint@2.0.0'];
+
+    assert.deepEqual(diffBlockedKeys(before, after), ['swiftlint@2.0.0']);
   });
 
   it('ignores a package that stopped being pending', () => {
-    assert.deepEqual(diffBlockedKeys(['swiftlint@1.9.0', 'esbuild@0.25.12'], ['esbuild@0.25.12']), []);
+    assert.deepEqual(diffBlockedKeys(['swiftlint@1.0.2', 'esbuild@0.28.0'], ['esbuild@0.28.0']), []);
   });
 });
 
@@ -185,28 +199,28 @@ describe('packageNameFromKey', () => {
   });
 
   it('keeps the scope of a scoped package', () => {
-    assert.equal(packageNameFromKey('@capacitor/core@9.0.0-alpha.7'), '@capacitor/core');
+    assert.equal(packageNameFromKey('@swc/core@1.16.18'), '@swc/core');
   });
 
   it('passes through a key with no version', () => {
     assert.equal(packageNameFromKey('swiftlint'), 'swiftlint');
-    assert.equal(packageNameFromKey('@capacitor/core'), '@capacitor/core');
+    assert.equal(packageNameFromKey('@swc/core'), '@swc/core');
   });
 });
 
 describe('formatBlockedScriptsError', () => {
   it('names the packages and gives the recovery commands', () => {
-    const message = formatBlockedScriptsError(['fsevents@2.3.3', 'swiftlint@2.0.0']);
+    const message = formatBlockedScriptsError(['esbuild@0.28.0', 'swiftlint@2.0.0']);
 
     assert.equal(
       message,
       [
         'npm blocked the install scripts of 2 packages, so the migration is incomplete:',
-        '  fsevents@2.3.3',
+        '  esbuild@0.28.0',
         '  swiftlint@2.0.0',
         '',
         'Review those packages, then approve and rebuild them:',
-        '  npm install-scripts approve fsevents swiftlint',
+        '  npm install-scripts approve esbuild swiftlint',
         '  npm rebuild',
         '',
         'The migration itself does not need to be run again.',
@@ -221,11 +235,11 @@ describe('formatBlockedScriptsError', () => {
   });
 
   it('counts packages, not versions, when several versions are blocked', () => {
-    const message = formatBlockedScriptsError(['esbuild@0.25.12', 'esbuild@0.21.5']);
+    const message = formatBlockedScriptsError(['esbuild@0.28.0', 'esbuild@0.27.7']);
 
     assert.match(message, /^npm blocked the install scripts of 1 package, so/);
-    assert.match(message, /^ {2}esbuild@0\.25\.12$/m);
-    assert.match(message, /^ {2}esbuild@0\.21\.5$/m);
+    assert.match(message, /^ {2}esbuild@0\.28\.0$/m);
+    assert.match(message, /^ {2}esbuild@0\.27\.7$/m);
     assert.match(message, /^ {2}npm install-scripts approve esbuild$/m);
   });
 

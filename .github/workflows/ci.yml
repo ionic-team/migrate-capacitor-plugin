@@ -12,9 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22.18 is the devEngines floor: the oldest Node with both `node --test`
-        # globs and unflagged TypeScript type stripping.
-        node: ['22.18', '24']
+        # 24 is the engines floor, matching the Capacitor 9 CLI. It also covers what
+        # `npm test` needs: `node --test` globs and unflagged TypeScript type stripping.
+        node: ['24']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
