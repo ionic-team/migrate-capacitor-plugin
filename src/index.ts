@@ -247,6 +247,7 @@ export const run = async (): Promise<void> => {
         'com.google.gms:google-services': gmsVersion,
       };
       await updateBuildGradle(buildGradle, variablesAndClasspaths);
+      await shipProguardRules(dir, pluginJSON.capacitor.android.src, buildGradle);
     }
   }
 
@@ -290,6 +291,45 @@ export const run = async (): Promise<void> => {
     );
   }
 };
+
+// Rules in android/proguard-rules.pro only reach apps through consumerProguardFiles and the published files.
+async function shipProguardRules(dir: string, androidSrc: string, buildGradle: string): Promise<void> {
+  const rulesFile = join(dir, androidSrc, 'proguard-rules.pro');
+  const gradleText = readFile(buildGradle);
+  if (!existsSync(rulesFile) || !gradleText) {
+    return;
+  }
+  let changed = false;
+  let wired = gradleText;
+  if (!wired.includes('consumerProguardFiles')) {
+    wired = wired.replace(/(defaultConfig\s*\{(\r?\n))([ \t]*)/, `$1$3consumerProguardFiles "proguard-rules.pro"$2$3`);
+    if (wired === gradleText) {
+      logger.warn(`Unable to add consumerProguardFiles to ${buildGradle}. Add it so ${rulesFile} reaches apps.`);
+      return;
+    }
+    writeFileSync(buildGradle, wired, 'utf-8');
+    changed = true;
+  }
+  if (!/consumerProguardFiles.*proguard-rules\.pro/.test(wired)) {
+    return;
+  }
+
+  const packageJson = join(dir, 'package.json');
+  const pluginJSON = await readJSON(packageJson);
+  const entry = `${androidSrc}/proguard-rules.pro`;
+  if (pluginJSON.files && ![entry, androidSrc, `${androidSrc}/`].some((file) => pluginJSON.files.includes(file))) {
+    pluginJSON.files.push(entry);
+    await writeJSON(packageJson, pluginJSON, { spaces: 2 });
+    changed = true;
+  }
+
+  const rules = readFileSync(rulesFile, 'utf-8')
+    .split(/\r?\n/)
+    .filter((line) => line.trim() && !line.trim().startsWith('#'));
+  if (changed && rules.length) {
+    logger.warn(`${entry} now ships to apps. Review these rules before publishing:\n${rules.join('\n')}`);
+  }
+}
 
 async function updateGradleProperties(filename: string): Promise<void> {
   const txt = readFile(filename);
