@@ -34,6 +34,10 @@ function eslintIgnoresFrom(eslintIgnorePath: string): string[] {
         .map((line) => line.trim())
         .filter((line) => line.length > 0 && !line.startsWith('#'))
     : ['build', 'dist', 'example-app'];
+  // the example app has its own lint setup, and eslint 10 no longer reads its .eslintrc
+  if (!entries.some((entry) => entry.includes('example-app'))) {
+    entries.push('example-app');
+  }
 
   return entries.map((entry) => {
     if (entry.endsWith('/**')) {
