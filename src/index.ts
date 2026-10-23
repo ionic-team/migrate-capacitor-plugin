@@ -15,10 +15,10 @@ import { coerce, gte, lt, valid } from 'semver';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '9.0.0-alpha.7';
+const coreVersion = '9.0.0-alpha.8';
 const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
-const gradleVersion = '9.5.1';
-const AGPVersion = '9.2.1';
+const gradleVersion = '9.8.2';
+const AGPVersion = '9.4.1';
 const gmsVersion = '4.5.0';
 const docgenVersion = '^0.3.1';
 const eslintVersion = '^10.0.0';
@@ -99,17 +99,17 @@ const variables = {
   minSdkVersion: 26,
   compileSdkVersion: 37,
   androidxActivityVersion: '1.13.0',
-  androidxAppCompatVersion: '1.7.1',
+  androidxAppCompatVersion: '1.8.0',
   androidxCoordinatorLayoutVersion: '1.3.0',
-  androidxCoreVersion: '1.19.0',
-  androidxFragmentVersion: '1.8.9',
+  androidxCoreVersion: '1.19.1',
+  androidxFragmentVersion: '1.9.1',
   firebaseMessagingVersion: '25.0.1',
   playServicesLocationVersion: '21.4.0',
   androidxBrowserVersion: '1.10.0',
   androidxMaterialVersion: '1.14.0',
   androidxExifInterfaceVersion: '1.4.2',
   coreSplashScreenVersion: '1.2.0',
-  androidxWebkitVersion: '1.16.0',
+  androidxWebkitVersion: '1.17.1',
   junitVersion: '4.13.2',
   androidxJunitVersion: '1.3.0',
   androidxEspressoCoreVersion: '3.7.0',
@@ -343,6 +343,7 @@ export const run = async (): Promise<void> => {
         'com.google.gms:google-services': gmsVersion,
       };
       await updateBuildGradle(buildGradle, variablesAndClasspaths);
+      await shipProguardRules(dir, pluginJSON.capacitor.android.src, buildGradle);
     }
   }
 
@@ -397,6 +398,45 @@ export const run = async (): Promise<void> => {
     );
   }
 };
+
+// Rules in android/proguard-rules.pro only reach apps through consumerProguardFiles and the published files.
+async function shipProguardRules(dir: string, androidSrc: string, buildGradle: string): Promise<void> {
+  const rulesFile = join(dir, androidSrc, 'proguard-rules.pro');
+  const gradleText = readFile(buildGradle);
+  if (!existsSync(rulesFile) || !gradleText) {
+    return;
+  }
+  let changed = false;
+  let wired = gradleText;
+  if (!wired.includes('consumerProguardFiles')) {
+    wired = wired.replace(/(defaultConfig\s*\{(\r?\n))([ \t]*)/, `$1$3consumerProguardFiles "proguard-rules.pro"$2$3`);
+    if (wired === gradleText) {
+      logger.warn(`Unable to add consumerProguardFiles to ${buildGradle}. Add it so ${rulesFile} reaches apps.`);
+      return;
+    }
+    writeFileSync(buildGradle, wired, 'utf-8');
+    changed = true;
+  }
+  if (!/consumerProguardFiles.*proguard-rules\.pro/.test(wired)) {
+    return;
+  }
+
+  const packageJson = join(dir, 'package.json');
+  const pluginJSON = await readJSON(packageJson);
+  const entry = `${androidSrc}/proguard-rules.pro`;
+  if (pluginJSON.files && ![entry, androidSrc, `${androidSrc}/`].some((file) => pluginJSON.files.includes(file))) {
+    pluginJSON.files.push(entry);
+    await writeJSON(packageJson, pluginJSON, { spaces: 2 });
+    changed = true;
+  }
+
+  const rules = readFileSync(rulesFile, 'utf-8')
+    .split(/\r?\n/)
+    .filter((line) => line.trim() && !line.trim().startsWith('#'));
+  if (changed && rules.length) {
+    logger.warn(`${entry} now ships to apps. Review these rules before publishing:\n${rules.join('\n')}`);
+  }
+}
 
 async function updateGradleProperties(filename: string): Promise<void> {
   const txt = readFile(filename);
