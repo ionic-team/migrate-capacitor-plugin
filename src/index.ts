@@ -49,6 +49,21 @@ function eslintIgnoresFrom(eslintIgnorePath: string): string[] {
   });
 }
 
+function existingFlatConfig(dir: string): string | undefined {
+  return ['js', 'mjs', 'cjs', 'ts', 'mts', 'cts']
+    .map((ext) => `eslint.config.${ext}`)
+    .find((file) => existsSync(join(dir, file)));
+}
+
+// @ionic/eslint-config already depends on these. Plugins on the shared config often list them too,
+// and their older majors only support eslint 9 or lower, which makes npm install fail.
+const bundledByIonicEslintConfig = [
+  'eslint-plugin-import',
+  'eslint-config-prettier',
+  '@typescript-eslint/parser',
+  '@typescript-eslint/eslint-plugin',
+];
+
 function eslintConfigCjsFor(ignores: string[]): string {
   const lines = ignores.map((entry) => `      '${entry}',`).join('\n');
   return `const ionic = require('@ionic/eslint-config/recommended');
@@ -150,6 +165,12 @@ export const run = async (): Promise<void> => {
       pluginJSON.devDependencies['eslint'] = eslintVersion;
     }
     delete pluginJSON.eslintConfig;
+    // a hand-written flat config may use these directly, so only drop them when the shared config replaces it
+    if (!existingFlatConfig(dir)) {
+      for (const dep of bundledByIonicEslintConfig) {
+        delete pluginJSON.devDependencies[dep];
+      }
+    }
     if (pluginJSON.scripts?.['eslint']) {
       pluginJSON.scripts['eslint'] = pluginJSON.scripts['eslint'].replace(' --ext ts', '');
     }
@@ -240,8 +261,7 @@ export const run = async (): Promise<void> => {
         removeSync(file);
       }
     }
-    const flatConfigs = ['js', 'mjs', 'cjs', 'ts', 'mts', 'cts'].map((ext) => `eslint.config.${ext}`);
-    const existingConfig = flatConfigs.find((file) => existsSync(join(dir, file)));
+    const existingConfig = existingFlatConfig(dir);
     if (existingConfig) {
       // a hand-written flat config may still load the 0.4 eslintrc export through FlatCompat
       logger.warn(
@@ -252,7 +272,9 @@ export const run = async (): Promise<void> => {
     }
   }
 
-  rimraf.sync(join(dir, 'node_modules/@capacitor'));
+  // start from a clean tree: npm treats what is already installed as the starting point, and an
+  // installed eslint 8 with @ionic/eslint-config 0.4 blocks the move to eslint 10 and 0.5
+  rimraf.sync(join(dir, 'node_modules'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
   try {
