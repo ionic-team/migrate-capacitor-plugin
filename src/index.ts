@@ -15,10 +15,10 @@ import { coerce, gte, lt, valid } from 'semver';
 import { logger } from './log';
 import { runCommand } from './subprocess';
 
-const coreVersion = '9.0.0-alpha.7';
+const coreVersion = '9.0.0-alpha.8';
 const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
-const gradleVersion = '9.5.1';
-const AGPVersion = '9.2.1';
+const gradleVersion = '9.8.2';
+const AGPVersion = '9.4.1';
 const gmsVersion = '4.5.0';
 const docgenVersion = '^0.3.1';
 const eslintVersion = '^8.57.1';
