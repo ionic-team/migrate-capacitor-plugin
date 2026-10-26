@@ -21,9 +21,71 @@ const gradleVersion = '9.8.2';
 const AGPVersion = '9.4.1';
 const gmsVersion = '4.5.0';
 const docgenVersion = '^0.3.1';
-const eslintVersion = '^8.57.1';
-const ionicEslintVersion = '^0.4.0';
+const eslintVersion = '^10.0.0';
+const ionicEslintVersion = '^0.5.0';
 const ionicPrettierVersion = '^4.0.0';
+
+// Flat config has no equivalent of .eslintignore, so its entries move into the config.
+// Keep them: a plugin that excluded docs/ or website/ should not start linting them.
+function eslintIgnoresFrom(eslintIgnorePath: string): string[] {
+  const entries = existsSync(eslintIgnorePath)
+    ? readFileSync(eslintIgnorePath, 'utf-8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith('#'))
+    : ['build', 'dist', 'example-app'];
+  // the example app has its own lint setup, and eslint 10 no longer reads its .eslintrc
+  if (!entries.some((entry) => entry.includes('example-app'))) {
+    entries.push('example-app');
+  }
+
+  return entries.map((entry) => {
+    if (entry.endsWith('/**')) {
+      return entry;
+    }
+    const bare = entry.replace(/\/$/, '');
+    const name = bare.split('/').pop() ?? bare;
+    // a dot anywhere but the front means it is a file, not a directory
+    if (name.indexOf('.') > 0) {
+      return bare;
+    }
+    return bare.includes('/') ? `${bare}/**` : `**/${bare}/**`;
+  });
+}
+
+function existingFlatConfig(dir: string): string | undefined {
+  return ['js', 'mjs', 'cjs', 'ts', 'mts', 'cts']
+    .map((ext) => `eslint.config.${ext}`)
+    .find((file) => existsSync(join(dir, file)));
+}
+
+// @ionic/eslint-config already depends on these. Plugins on the shared config often list them too,
+// and their older majors only support eslint 9 or lower, which makes npm install fail.
+const bundledByIonicEslintConfig = [
+  'eslint-plugin-import',
+  'eslint-config-prettier',
+  '@typescript-eslint/parser',
+  '@typescript-eslint/eslint-plugin',
+];
+
+function eslintConfigCjsFor(ignores: string[]): string {
+  const lines = ignores.map((entry) => `      '${entry}',`).join('\n');
+  return `const ionic = require('@ionic/eslint-config/recommended');
+
+module.exports = [
+  {
+    ignores: [
+${lines}
+      // the old lint script passed --ext ts, which flat config ignores
+      '**/*.js',
+      '**/*.mjs',
+      '**/*.cjs',
+    ],
+  },
+  ...ionic,
+];
+`;
+}
 const ionicSwiftlintVersion = '^2.0.0';
 const prettierJavaVersion = '^2.7.7';
 const prettierVersion = '^3.6.2';
@@ -100,11 +162,23 @@ export const run = async (): Promise<void> => {
       pluginJSON.peerDependencies[dep] = `>=${coreVersion}`;
     }
   }
+  let eslintUpdated = false;
   if (pluginJSON.devDependencies?.['@ionic/eslint-config']) {
     pluginJSON.devDependencies['@ionic/eslint-config'] = ionicEslintVersion;
     if (pluginJSON.devDependencies?.['eslint']) {
       pluginJSON.devDependencies['eslint'] = eslintVersion;
     }
+    delete pluginJSON.eslintConfig;
+    // a hand-written flat config may use these directly, so only drop them when the shared config replaces it
+    if (!existingFlatConfig(dir)) {
+      for (const dep of bundledByIonicEslintConfig) {
+        delete pluginJSON.devDependencies[dep];
+      }
+    }
+    if (pluginJSON.scripts?.['eslint']) {
+      pluginJSON.scripts['eslint'] = pluginJSON.scripts['eslint'].replace(' --ext ts', '');
+    }
+    eslintUpdated = true;
   }
   if (pluginJSON.devDependencies?.['@ionic/swiftlint-config']) {
     pluginJSON.devDependencies['@ionic/swiftlint-config'] = ionicSwiftlintVersion;
@@ -182,7 +256,29 @@ export const run = async (): Promise<void> => {
 
   writeFileSync(packageJson, packageJsonText, 'utf-8');
 
-  rimraf.sync(join(dir, 'node_modules/@capacitor'));
+  if (eslintUpdated) {
+    const ignores = eslintIgnoresFrom(join(dir, '.eslintignore'));
+    // ESLint 10 reads neither of these, so leaving them behind is just dead config
+    const stale = ['.eslintignore', '.eslintrc', '.eslintrc.js', '.eslintrc.cjs', '.eslintrc.json', '.eslintrc.yml'];
+    for (const file of stale.map((name) => join(dir, name))) {
+      if (existsSync(file)) {
+        removeSync(file);
+      }
+    }
+    const existingConfig = existingFlatConfig(dir);
+    if (existingConfig) {
+      // a hand-written flat config may still load the 0.4 eslintrc export through FlatCompat
+      logger.warn(
+        `${existingConfig} already exists and was left as is. @ionic/eslint-config/recommended is now a flat config array, so spread it into the config instead of loading it through FlatCompat.`,
+      );
+    } else {
+      writeFileSync(join(dir, 'eslint.config.cjs'), eslintConfigCjsFor(ignores), 'utf-8');
+    }
+  }
+
+  // start from a clean tree: npm treats what is already installed as the starting point, and an
+  // installed eslint 8 with @ionic/eslint-config 0.4 blocks the move to eslint 10 and 0.5
+  rimraf.sync(join(dir, 'node_modules'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
   try {
@@ -190,7 +286,7 @@ export const run = async (): Promise<void> => {
       ...opts,
       cwd: dir,
     });
-  } catch (e: any) {
+  } catch {
     logger.warn('npm install failed, please, install the dependencies using your package manager of choice');
   }
 
@@ -282,6 +378,17 @@ export const run = async (): Promise<void> => {
   }
 
   logger.info('Plugin migrated to Capacitor 9!');
+
+  if (eslintUpdated) {
+    logger.info('');
+    logger.info('⚠️  Note: ESLint has been updated to v10 and @ionic/eslint-config to v0.5.0, which uses flat config.');
+    logger.info(
+      'An eslint.config.cjs file was added; .eslintignore and the eslintConfig block in package.json were removed.',
+    );
+    logger.info(
+      'Running lint may surface new reports; see https://github.com/ionic-team/eslint-config#migrating-from-04-or-earlier',
+    );
+  }
 
   if (prettierUpdatedFromV2) {
     logger.info('');
