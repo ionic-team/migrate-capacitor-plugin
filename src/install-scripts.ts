@@ -64,8 +64,8 @@ export function parseBlockedPackages(stdout: string): string[] | null {
 // asked about. Diffing exact keys would report that as newly blocked when nothing changed
 // but the number.
 export function diffBlockedKeys(before: string[], after: string[]): string[] {
-  const seen = new Set(before.map(packageNameFromKey));
-  return after.filter((key) => !seen.has(packageNameFromKey(key)));
+  const seen = new Set(before);
+  return after.filter((key) => !seen.has(key));
 }
 
 export function packageNameFromKey(key: string): string {
