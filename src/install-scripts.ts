@@ -60,12 +60,13 @@ export function parseBlockedPackages(stdout: string): string[] | null {
 
 // Compared by package name, not by `name@version`. The migration rewrites dependency ranges
 // — swiftlint, rollup, typescript, prettier and the @ionic/* configs all move — so a package
-// the author already reviewed and left pending comes back under a new version it was never
-// asked about. Diffing exact keys would report that as newly blocked when nothing changed
-// but the number.
+// that was already blocked before the migration ran comes back under a new version. Diffing
+// exact keys would report that as newly blocked when nothing changed but the number.
+// Approvals are pinned per version and approved packages are absent from the baseline, so a
+// name can only match here when npm was already blocking that package beforehand.
 export function diffBlockedKeys(before: string[], after: string[]): string[] {
-  const seen = new Set(before);
-  return after.filter((key) => !seen.has(key));
+  const seen = new Set(before.map(packageNameFromKey));
+  return after.filter((key) => !seen.has(packageNameFromKey(key)));
 }
 
 export function packageNameFromKey(key: string): string {
