@@ -23,15 +23,77 @@ import { logger } from './log';
 import { declaresOtherPackageManager } from './package-manager';
 import { runCommand } from './subprocess';
 
-const coreVersion = '9.0.0-alpha.7';
+const coreVersion = '9.0.0-alpha.8';
 const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
-const gradleVersion = '9.5.1';
-const AGPVersion = '9.2.1';
+const gradleVersion = '9.8.2';
+const AGPVersion = '9.4.1';
 const gmsVersion = '4.5.0';
 const docgenVersion = '^0.3.1';
-const eslintVersion = '^8.57.1';
-const ionicEslintVersion = '^0.4.0';
+const eslintVersion = '^10.0.0';
+const ionicEslintVersion = '^0.5.0';
 const ionicPrettierVersion = '^4.0.0';
+
+// Flat config has no equivalent of .eslintignore, so its entries move into the config.
+// Keep them: a plugin that excluded docs/ or website/ should not start linting them.
+function eslintIgnoresFrom(eslintIgnorePath: string): string[] {
+  const entries = existsSync(eslintIgnorePath)
+    ? readFileSync(eslintIgnorePath, 'utf-8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith('#'))
+    : ['build', 'dist', 'example-app'];
+  // the example app has its own lint setup, and eslint 10 no longer reads its .eslintrc
+  if (!entries.some((entry) => entry.includes('example-app'))) {
+    entries.push('example-app');
+  }
+
+  return entries.map((entry) => {
+    if (entry.endsWith('/**')) {
+      return entry;
+    }
+    const bare = entry.replace(/\/$/, '');
+    const name = bare.split('/').pop() ?? bare;
+    // a dot anywhere but the front means it is a file, not a directory
+    if (name.indexOf('.') > 0) {
+      return bare;
+    }
+    return bare.includes('/') ? `${bare}/**` : `**/${bare}/**`;
+  });
+}
+
+function existingFlatConfig(dir: string): string | undefined {
+  return ['js', 'mjs', 'cjs', 'ts', 'mts', 'cts']
+    .map((ext) => `eslint.config.${ext}`)
+    .find((file) => existsSync(join(dir, file)));
+}
+
+// @ionic/eslint-config already depends on these. Plugins on the shared config often list them too,
+// and their older majors only support eslint 9 or lower, which makes npm install fail.
+const bundledByIonicEslintConfig = [
+  'eslint-plugin-import',
+  'eslint-config-prettier',
+  '@typescript-eslint/parser',
+  '@typescript-eslint/eslint-plugin',
+];
+
+function eslintConfigCjsFor(ignores: string[]): string {
+  const lines = ignores.map((entry) => `      '${entry}',`).join('\n');
+  return `const ionic = require('@ionic/eslint-config/recommended');
+
+module.exports = [
+  {
+    ignores: [
+${lines}
+      // the old lint script passed --ext ts, which flat config ignores
+      '**/*.js',
+      '**/*.mjs',
+      '**/*.cjs',
+    ],
+  },
+  ...ionic,
+];
+`;
+}
 const ionicSwiftlintVersion = '^2.0.0';
 const prettierJavaVersion = '^2.7.7';
 const prettierVersion = '^3.6.2';
@@ -45,17 +107,17 @@ const variables = {
   minSdkVersion: 26,
   compileSdkVersion: 37,
   androidxActivityVersion: '1.13.0',
-  androidxAppCompatVersion: '1.7.1',
+  androidxAppCompatVersion: '1.8.0',
   androidxCoordinatorLayoutVersion: '1.3.0',
-  androidxCoreVersion: '1.19.0',
-  androidxFragmentVersion: '1.8.9',
+  androidxCoreVersion: '1.19.1',
+  androidxFragmentVersion: '1.9.1',
   firebaseMessagingVersion: '25.0.1',
   playServicesLocationVersion: '21.4.0',
   androidxBrowserVersion: '1.10.0',
   androidxMaterialVersion: '1.14.0',
   androidxExifInterfaceVersion: '1.4.2',
   coreSplashScreenVersion: '1.2.0',
-  androidxWebkitVersion: '1.16.0',
+  androidxWebkitVersion: '1.17.1',
   junitVersion: '4.13.2',
   androidxJunitVersion: '1.3.0',
   androidxEspressoCoreVersion: '3.7.0',
@@ -108,11 +170,23 @@ export const run = async (): Promise<void> => {
       pluginJSON.peerDependencies[dep] = `>=${coreVersion}`;
     }
   }
+  let eslintUpdated = false;
   if (pluginJSON.devDependencies?.['@ionic/eslint-config']) {
     pluginJSON.devDependencies['@ionic/eslint-config'] = ionicEslintVersion;
     if (pluginJSON.devDependencies?.['eslint']) {
       pluginJSON.devDependencies['eslint'] = eslintVersion;
     }
+    delete pluginJSON.eslintConfig;
+    // a hand-written flat config may use these directly, so only drop them when the shared config replaces it
+    if (!existingFlatConfig(dir)) {
+      for (const dep of bundledByIonicEslintConfig) {
+        delete pluginJSON.devDependencies[dep];
+      }
+    }
+    if (pluginJSON.scripts?.['eslint']) {
+      pluginJSON.scripts['eslint'] = pluginJSON.scripts['eslint'].replace(' --ext ts', '');
+    }
+    eslintUpdated = true;
   }
   if (pluginJSON.devDependencies?.['@ionic/swiftlint-config']) {
     pluginJSON.devDependencies['@ionic/swiftlint-config'] = ionicSwiftlintVersion;
@@ -190,6 +264,26 @@ export const run = async (): Promise<void> => {
 
   writeFileSync(packageJson, packageJsonText, 'utf-8');
 
+  if (eslintUpdated) {
+    const ignores = eslintIgnoresFrom(join(dir, '.eslintignore'));
+    // ESLint 10 reads neither of these, so leaving them behind is just dead config
+    const stale = ['.eslintignore', '.eslintrc', '.eslintrc.js', '.eslintrc.cjs', '.eslintrc.json', '.eslintrc.yml'];
+    for (const file of stale.map((name) => join(dir, name))) {
+      if (existsSync(file)) {
+        removeSync(file);
+      }
+    }
+    const existingConfig = existingFlatConfig(dir);
+    if (existingConfig) {
+      // a hand-written flat config may still load the 0.4 eslintrc export through FlatCompat
+      logger.warn(
+        `${existingConfig} already exists and was left as is. @ionic/eslint-config/recommended is now a flat config array, so spread it into the config instead of loading it through FlatCompat.`,
+      );
+    } else {
+      writeFileSync(join(dir, 'eslint.config.cjs'), eslintConfigCjsFor(ignores), 'utf-8');
+    }
+  }
+
   const runInDir: CommandRunner = (command, args) => runCommand(command, args, { cwd: dir });
 
   // Take the baseline before anything is removed or reinstalled: `npm install-scripts ls`
@@ -201,7 +295,9 @@ export const run = async (): Promise<void> => {
     logger.warn('Could not read the blocked install scripts of this plugin, skipping the check');
   }
 
-  rimraf.sync(join(dir, 'node_modules/@capacitor'));
+  // start from a clean tree: npm treats what is already installed as the starting point, and an
+  // installed eslint 8 with @ionic/eslint-config 0.4 blocks the move to eslint 10 and 0.5
+  rimraf.sync(join(dir, 'node_modules'));
   rimraf.sync(join(dir, 'package-lock.json'));
 
   let installError: string | undefined;
@@ -283,6 +379,7 @@ export const run = async (): Promise<void> => {
         'com.google.gms:google-services': gmsVersion,
       };
       await updateBuildGradle(buildGradle, variablesAndClasspaths);
+      await shipProguardRules(dir, pluginJSON.capacitor.android.src, buildGradle);
     }
   }
 
@@ -316,6 +413,17 @@ export const run = async (): Promise<void> => {
     }
   }
 
+  if (eslintUpdated) {
+    logger.info('');
+    logger.info('⚠️  Note: ESLint has been updated to v10 and @ionic/eslint-config to v0.5.0, which uses flat config.');
+    logger.info(
+      'An eslint.config.cjs file was added; .eslintignore and the eslintConfig block in package.json were removed.',
+    );
+    logger.info(
+      'Running lint may surface new reports; see https://github.com/ionic-team/eslint-config#migrating-from-04-or-earlier',
+    );
+  }
+
   if (prettierUpdatedFromV2) {
     logger.info('');
     logger.info('⚠️  Note: Prettier has been updated from v2 to v3.');
@@ -335,6 +443,45 @@ export const run = async (): Promise<void> => {
 
   logger.info('Plugin migrated to Capacitor 9!');
 };
+
+// Rules in android/proguard-rules.pro only reach apps through consumerProguardFiles and the published files.
+async function shipProguardRules(dir: string, androidSrc: string, buildGradle: string): Promise<void> {
+  const rulesFile = join(dir, androidSrc, 'proguard-rules.pro');
+  const gradleText = readFile(buildGradle);
+  if (!existsSync(rulesFile) || !gradleText) {
+    return;
+  }
+  let changed = false;
+  let wired = gradleText;
+  if (!wired.includes('consumerProguardFiles')) {
+    wired = wired.replace(/(defaultConfig\s*\{(\r?\n))([ \t]*)/, `$1$3consumerProguardFiles "proguard-rules.pro"$2$3`);
+    if (wired === gradleText) {
+      logger.warn(`Unable to add consumerProguardFiles to ${buildGradle}. Add it so ${rulesFile} reaches apps.`);
+      return;
+    }
+    writeFileSync(buildGradle, wired, 'utf-8');
+    changed = true;
+  }
+  if (!/consumerProguardFiles.*proguard-rules\.pro/.test(wired)) {
+    return;
+  }
+
+  const packageJson = join(dir, 'package.json');
+  const pluginJSON = await readJSON(packageJson);
+  const entry = `${androidSrc}/proguard-rules.pro`;
+  if (pluginJSON.files && ![entry, androidSrc, `${androidSrc}/`].some((file) => pluginJSON.files.includes(file))) {
+    pluginJSON.files.push(entry);
+    await writeJSON(packageJson, pluginJSON, { spaces: 2 });
+    changed = true;
+  }
+
+  const rules = readFileSync(rulesFile, 'utf-8')
+    .split(/\r?\n/)
+    .filter((line) => line.trim() && !line.trim().startsWith('#'));
+  if (changed && rules.length) {
+    logger.warn(`${entry} now ships to apps. Review these rules before publishing:\n${rules.join('\n')}`);
+  }
+}
 
 async function updateGradleProperties(filename: string): Promise<void> {
   const txt = readFile(filename);
