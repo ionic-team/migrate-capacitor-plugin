@@ -172,10 +172,8 @@ export const run = async (): Promise<void> => {
   }
   let eslintUpdated = false;
   if (pluginJSON.devDependencies?.['@ionic/eslint-config']) {
-    pluginJSON.devDependencies['@ionic/eslint-config'] = ionicEslintVersion;
-    if (pluginJSON.devDependencies?.['eslint']) {
-      pluginJSON.devDependencies['eslint'] = eslintVersion;
-    }
+    updateIfOlder(pluginJSON, '@ionic/eslint-config', ionicEslintVersion);
+    updateIfOlder(pluginJSON, 'eslint', eslintVersion);
     delete pluginJSON.eslintConfig;
     // a hand-written flat config may use these directly, so only drop them when the shared config replaces it
     if (!existingFlatConfig(dir)) {
@@ -188,25 +186,12 @@ export const run = async (): Promise<void> => {
     }
     eslintUpdated = true;
   }
-  if (pluginJSON.devDependencies?.['@ionic/swiftlint-config']) {
-    pluginJSON.devDependencies['@ionic/swiftlint-config'] = ionicSwiftlintVersion;
-  }
-  if (pluginJSON.devDependencies?.['swiftlint']) {
-    pluginJSON.devDependencies['swiftlint'] = ionicSwiftlintVersion;
-  }
-  if (pluginJSON.devDependencies?.['rimraf']) {
-    pluginJSON.devDependencies['rimraf'] = rimrafVersion;
-  }
-  if (pluginJSON.devDependencies?.['rollup']) {
-    pluginJSON.devDependencies['rollup'] = rollupVersion;
-  }
-  if (pluginJSON.devDependencies?.['typescript']) {
-    pluginJSON.devDependencies['typescript'] = typeScriptVersion;
-  }
-  if (pluginJSON.devDependencies?.['@types/node']) {
-    pluginJSON.devDependencies['@types/node'] = typesNodeVersion;
-  }
-
+  updateIfOlder(pluginJSON, '@ionic/swiftlint-config', ionicSwiftlintVersion);
+  updateIfOlder(pluginJSON, 'swiftlint', ionicSwiftlintVersion);
+  updateIfOlder(pluginJSON, 'rimraf', rimrafVersion);
+  updateIfOlder(pluginJSON, 'rollup', rollupVersion);
+  updateIfOlder(pluginJSON, 'typescript', typeScriptVersion);
+  updateIfOlder(pluginJSON, '@types/node', typesNodeVersion);
   let prettierUpdatedFromV2 = false;
   if (pluginJSON.devDependencies?.['@ionic/prettier-config']) {
     const existingPrettierVersion = pluginJSON.devDependencies?.['prettier'];
@@ -216,15 +201,13 @@ export const run = async (): Promise<void> => {
         prettierUpdatedFromV2 = true;
       }
     }
-    pluginJSON.devDependencies['@ionic/prettier-config'] = ionicPrettierVersion;
-    pluginJSON.devDependencies['prettier'] = prettierVersion;
-    pluginJSON.devDependencies['prettier-plugin-java'] = prettierJavaVersion;
+    updateIfOlder(pluginJSON, '@ionic/prettier-config', ionicPrettierVersion);
+    updateIfOlder(pluginJSON, 'prettier', prettierVersion);
+    updateIfOlder(pluginJSON, 'prettier-plugin-java', prettierJavaVersion);
     updatePrettierJava = true;
   }
 
-  if (pluginJSON.devDependencies?.['@capacitor/docgen']) {
-    pluginJSON.devDependencies['@capacitor/docgen'] = docgenVersion;
-  }
+  updateIfOlder(pluginJSON, '@capacitor/docgen', docgenVersion);
 
   if (pluginJSON.version?.startsWith('7.')) {
     pluginJSON.version = '8.0.0';
@@ -775,4 +758,15 @@ function getGradleWrapperVersion(filename: string): string {
   const version = txt.substring(txt.indexOf('gradle-') + 7, txt.indexOf('.zip', txt.indexOf('gradle-')));
   const semverVersion = coerce(version)?.version;
   return semverVersion ? semverVersion : '0.0.0';
+}
+
+function updateIfOlder(pluginJSON: any, dependency: string, version: string) {
+  const existingVersion = pluginJSON.devDependencies?.[dependency];
+  if (existingVersion) {
+    const cleanVersion = coerce(existingVersion);
+    const cleanNewVersion = coerce(version);
+    if (cleanVersion && cleanNewVersion && lt(cleanVersion, cleanNewVersion)) {
+      pluginJSON.devDependencies[dependency] = version;
+    }
+  }
 }
