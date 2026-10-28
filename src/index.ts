@@ -23,7 +23,7 @@ import { logger } from './log';
 import { declaresOtherPackageManager } from './package-manager';
 import { runCommand } from './subprocess';
 
-const coreVersion = '9.0.0-alpha.8';
+const coreVersion = '9.0.0-beta.0';
 const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
 const gradleVersion = '9.8.2';
 const AGPVersion = '9.4.1';
@@ -379,12 +379,6 @@ export const run = async (): Promise<void> => {
       const packageSwift = join(dir, 'Package.swift');
       await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, `${iOSVersion}.0`);
       await updateFile(packageSwift, '[.iOS(.v', ')],', iOSVersion);
-      await updateFile(
-        packageSwift,
-        '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git",',
-        ')',
-        ` from: "${coreVersion}"`,
-      );
       let packageSwiftText = readFileSync(packageSwift, 'utf-8');
       packageSwiftText = packageSwiftText.replace(
         /^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m,
@@ -392,6 +386,12 @@ export const run = async (): Promise<void> => {
       );
       packageSwiftText = packageSwiftText.replaceAll('capacitor-swift-pm', 'capacitor');
       writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
+      await updateFile(
+        packageSwift,
+        '.package(url: "https://github.com/ionic-team/capacitor.git",',
+        ')',
+        ` from: "${coreVersion}"`,
+      );
       await updatePodspec(dir, pluginJSON);
     }
   }
