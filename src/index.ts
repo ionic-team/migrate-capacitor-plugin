@@ -564,11 +564,11 @@ async function updateBuildGradle(
   gradleFile = updateDeprecatedPropertySyntax(gradleFile);
   gradleFile = updateKotlinOptions(gradleFile);
   gradleFile = gradleFile.replace(
-    /^\s*ext\.kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '\d+\.\d+\.\d+'\n?/m,
+    /^\s*ext\.kotlin_version = project\.hasProperty\(["']kotlin_version["']\) \? rootProject\.ext\.kotlin_version : '\d+\.\d+\.\d+'\n?/m,
     '',
   );
   gradleFile = gradleFile.replace(
-    /^\s*ext \{\n\s*kotlin_version = project\.hasProperty\("kotlin_version"\) \? rootProject\.ext\.kotlin_version : '[\d.]+'\n\s*\}\n?/gm,
+    /^\s*ext \{\n\s*kotlin_version = project\.hasProperty\(["']kotlin_version["']\) \? rootProject\.ext\.kotlin_version : '[\d.]+'\n\s*\}\n?/gm,
     '',
   );
   gradleFile = gradleFile.replace(
