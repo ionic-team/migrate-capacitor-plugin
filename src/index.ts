@@ -99,6 +99,7 @@ const prettierJavaVersion = '^2.7.7';
 const prettierVersion = '^3.6.2';
 const rimrafVersion = '^6.1.0';
 const rollupVersion = '^4.53.2';
+const rollupNodeResolveVersion = '^16.0.3';
 const typesNodeVersion = '^24.10.1';
 const typeScriptVersion = '^5.9.3';
 const iOSVersion = '16';
@@ -190,6 +191,7 @@ export const run = async (): Promise<void> => {
   updateIfOlder(pluginJSON, 'swiftlint', ionicSwiftlintVersion);
   updateIfOlder(pluginJSON, 'rimraf', rimrafVersion);
   updateIfOlder(pluginJSON, 'rollup', rollupVersion);
+  updateIfOlder(pluginJSON, '@rollup/plugin-node-resolve', rollupNodeResolveVersion);
   updateIfOlder(pluginJSON, 'typescript', typeScriptVersion);
   updateIfOlder(pluginJSON, '@types/node', typesNodeVersion);
   let prettierUpdatedFromV2 = false;
@@ -324,6 +326,16 @@ export const run = async (): Promise<void> => {
 
       // gradle.properties
       await updateGradleProperties(join(androidDir, 'gradle.properties'));
+
+      // AGP first, since the wrapper task below runs on the new Gradle, which can't load AGP 8
+      const variablesAndClasspaths = {
+        variables: variables,
+        'com.android.tools.build:gradle': AGPVersion,
+        'com.google.gms:google-services': gmsVersion,
+      };
+      await updateBuildGradle(buildGradle, variablesAndClasspaths);
+      await shipProguardRules(dir, pluginJSON.capacitor.android.src, buildGradle);
+
       const gradleWrapperPath = join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties');
 
       const gradleWrapperVersion = getGradleWrapperVersion(gradleWrapperPath);
@@ -355,14 +367,6 @@ export const run = async (): Promise<void> => {
           },
         );
       }
-
-      const variablesAndClasspaths = {
-        variables: variables,
-        'com.android.tools.build:gradle': AGPVersion,
-        'com.google.gms:google-services': gmsVersion,
-      };
-      await updateBuildGradle(buildGradle, variablesAndClasspaths);
-      await shipProguardRules(dir, pluginJSON.capacitor.android.src, buildGradle);
     }
   }
 
@@ -378,13 +382,25 @@ export const run = async (): Promise<void> => {
       );
       const packageSwift = join(dir, 'Package.swift');
       await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, `${iOSVersion}.0`);
-      await updateFile(packageSwift, '[.iOS(.v', ')],', iOSVersion);
       let packageSwiftText = readFileSync(packageSwift, 'utf-8');
+      packageSwiftText = packageSwiftText.replace(/\[\.iOS\(\.v(\d+)\)\]/, (platforms, version) =>
+        Number(version) < Number(iOSVersion) ? `[.iOS(.v${iOSVersion})]` : platforms,
+      );
+      // when Cordova is the last product, the comma before it has to go too
+      packageSwiftText = packageSwiftText.replace(
+        /,\n[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\)(?=\s*\])/,
+        '',
+      );
       packageSwiftText = packageSwiftText.replace(
         /^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m,
         '',
       );
       packageSwiftText = packageSwiftText.replaceAll('capacitor-swift-pm', 'capacitor');
+      // the version is replaced up to the first ")", so unwrap .upToNextMajor(from:) first
+      packageSwiftText = packageSwiftText.replace(
+        /(\.package\(url: "https:\/\/github\.com\/ionic-team\/capacitor\.git",\s*)\.upToNextMajor\((from:\s*"[^"]*")\)/,
+        '$1$2',
+      );
       writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
       await updateFile(
         packageSwift,
