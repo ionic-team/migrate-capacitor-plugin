@@ -21,6 +21,7 @@ import {
 import type { CommandRunner } from './install-scripts';
 import { logger } from './log';
 import { declaresOtherPackageManager } from './package-manager';
+import { migratePackageSwift } from './package-swift';
 import { runCommand } from './subprocess';
 
 const coreVersion = '9.0.0-beta.0';
@@ -382,26 +383,9 @@ export const run = async (): Promise<void> => {
       );
       const packageSwift = join(dir, 'Package.swift');
       await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, `${iOSVersion}.0`);
-      let packageSwiftText = readFileSync(packageSwift, 'utf-8');
-      packageSwiftText = packageSwiftText.replace(/\[\.iOS\(\.v(\d+)\)\]/, (platforms, version) =>
-        Number(version) < Number(iOSVersion) ? `[.iOS(.v${iOSVersion})]` : platforms,
-      );
-      // when Cordova is the last product, the comma before it has to go too
-      packageSwiftText = packageSwiftText.replace(
-        /,\n[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\)(?=\s*\])/,
-        '',
-      );
-      packageSwiftText = packageSwiftText.replace(
-        /^[ \t]*\.product\(name:\s*"Cordova",\s*package:\s*"capacitor-swift-pm"\),?\n?/m,
-        '',
-      );
-      packageSwiftText = packageSwiftText.replaceAll('capacitor-swift-pm', 'capacitor');
-      // the version is replaced up to the first ")", so unwrap .upToNextMajor(from:) first
-      packageSwiftText = packageSwiftText.replace(
-        /(\.package\(url: "https:\/\/github\.com\/ionic-team\/capacitor\.git",\s*)\.upToNextMajor\((from:\s*"[^"]*")\)/,
-        '$1$2',
-      );
-      writeFileSync(packageSwift, packageSwiftText, { encoding: 'utf-8' });
+      writeFileSync(packageSwift, migratePackageSwift(readFileSync(packageSwift, 'utf-8'), iOSVersion), {
+        encoding: 'utf-8',
+      });
       await updateFile(
         packageSwift,
         '.package(url: "https://github.com/ionic-team/capacitor.git",',
