@@ -232,7 +232,7 @@ export const run = async (): Promise<void> => {
     const gitIgnoreText = readFile(gitIgnore);
     if (gitIgnoreText && prettierIgnoreText) {
       if (gitIgnoreText.includes('build')) {
-        prettierIgnoreText = prettierIgnoreText.replace(`build\n`, '');
+        prettierIgnoreText = prettierIgnoreText.replace(/^build\n/m, '');
       }
       if (gitIgnoreText.includes('dist')) {
         prettierIgnoreText = prettierIgnoreText.replace(`dist\n`, '');
