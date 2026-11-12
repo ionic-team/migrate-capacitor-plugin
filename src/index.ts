@@ -123,7 +123,7 @@ const variables = {
   junitVersion: '4.13.2',
   androidxJunitVersion: '1.3.0',
   androidxEspressoCoreVersion: '3.7.0',
-  googleMapsPlayServicesVersion: '20.0.0',
+  googleMapsPlayServicesVersion: '20.1.0',
   googleMapsUtilsVersion: '5.0.0',
   googleMapsKtxVersion: '6.0.1',
   googleMapsUtilsKtxVersion: '6.0.1',
