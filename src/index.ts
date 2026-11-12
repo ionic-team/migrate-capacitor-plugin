@@ -499,8 +499,9 @@ function updatePodspec(dir: string, pluginJSON: any) {
     return false;
   }
   txt = txt.replace('s.ios.deployment_target  =', 's.ios.deployment_target =');
-  const prevIOS = Number(iOSVersion) - 1;
-  txt = txt.replace(`s.ios.deployment_target = '${prevIOS}.0'`, `s.ios.deployment_target = '${iOSVersion}.0'`);
+  txt = txt.replace(/s\.ios\.deployment_target = '(\d+)\.\d+'/, (match, major) =>
+    Number(major) < Number(iOSVersion) ? `s.ios.deployment_target = '${iOSVersion}.0'` : match,
+  );
   writeFileSync(podspecFile, txt, { encoding: 'utf-8' });
 }
 
