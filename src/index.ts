@@ -586,10 +586,12 @@ async function updateBuildGradle(
       '',
     );
   }
-  if (!gradleFile.includes('kapt(') && !gradleFile.includes('kapt ')) {
-    gradleFile = gradleFile.replace(`apply plugin: 'kotlin-kapt'\n`, '');
-  } else {
-    throw 'kotlin-kapt is not compatible with Gradle 9 built-in Kotlin, migrate to KSP and run plugin-migration-v8-to-v9 again';
+  const kaptPlugin = `apply plugin: 'kotlin-kapt'`;
+  if (gradleFile.includes(kaptPlugin)) {
+    if (/\bkapt(?:Test|AndroidTest)?[ (]/.test(gradleFile)) {
+      throw 'kotlin-kapt is not compatible with Gradle 9 built-in Kotlin, migrate to KSP and run plugin-migration-v8-to-v9 again';
+    }
+    gradleFile = gradleFile.replace(`${kaptPlugin}\n`, '');
   }
 
   gradleFile = gradleFile.replace(`apply plugin: 'org.jetbrains.kotlin.android'\n`, '');
