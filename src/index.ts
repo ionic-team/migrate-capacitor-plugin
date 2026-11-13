@@ -608,7 +608,10 @@ async function updateBuildGradle(
     `implementation "androidx.core:core:$androidxCoreVersion"`,
   );
   if (gradleFile.includes(`androidx.core:core-ktx:1`)) {
-    gradleFile = setAllStringIn(gradleFile, `androidx.core:core`, `'`, `:${variables.androidxCoreVersion}`);
+    gradleFile = gradleFile.replace(
+      /androidx\.core:core-ktx:1[^'"]*(['"])/g,
+      `androidx.core:core:${variables.androidxCoreVersion}$1`,
+    );
   }
 
   writeFileSync(filename, gradleFile, 'utf-8');
