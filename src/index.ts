@@ -383,9 +383,11 @@ export const run = async (): Promise<void> => {
       );
       const packageSwift = join(dir, 'Package.swift');
       await updateFile(join(iosDir, 'Podfile'), `platform :ios, '`, `'`, `${iOSVersion}.0`);
-      writeFileSync(packageSwift, migratePackageSwift(readFileSync(packageSwift, 'utf-8'), iOSVersion), {
-        encoding: 'utf-8',
-      });
+      if (existsSync(packageSwift)) {
+        writeFileSync(packageSwift, migratePackageSwift(readFileSync(packageSwift, 'utf-8'), iOSVersion), {
+          encoding: 'utf-8',
+        });
+      }
       await updateFile(
         packageSwift,
         '.package(url: "https://github.com/ionic-team/capacitor.git",',
