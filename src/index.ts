@@ -24,7 +24,7 @@ import { declaresOtherPackageManager } from './package-manager';
 import { migratePackageSwift } from './package-swift';
 import { runCommand } from './subprocess';
 
-const coreVersion = '9.0.0-beta.0';
+const coreVersion = '9.0.0-rc.0';
 const coreNPMVersion = coreVersion.includes('-') ? 'next' : `^${coreVersion}`;
 const gradleVersion = '9.8.2';
 const AGPVersion = '9.4.1';
