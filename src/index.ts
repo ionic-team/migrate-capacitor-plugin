@@ -22,6 +22,7 @@ import type { CommandRunner } from './install-scripts';
 import { logger } from './log';
 import { declaresOtherPackageManager } from './package-manager';
 import { migratePackageSwift } from './package-swift';
+import { setPropertyLookupReceiver } from './property-lookup';
 import { runCommand } from './subprocess';
 
 const coreVersion = '9.0.0-rc.0';
@@ -520,6 +521,8 @@ async function updateBuildGradle(
     return;
   }
   gradleFile = gradleFile.replaceAll(' =  ', ' = ');
+  // the matchers below expect `project.hasProperty`, also when the tool runs again on a migrated file
+  gradleFile = setPropertyLookupReceiver(gradleFile, 'project');
   logger.info('Updating build.gradle');
   gradleFile = gradleFile.replaceAll('androidxCoreKTXVersion', 'androidxCoreVersion');
 
@@ -614,6 +617,7 @@ async function updateBuildGradle(
     );
   }
 
+  gradleFile = setPropertyLookupReceiver(gradleFile, 'rootProject');
   writeFileSync(filename, gradleFile, 'utf-8');
 }
 
