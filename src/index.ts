@@ -159,6 +159,7 @@ export const run = async (): Promise<void> => {
   const packageJson = join(dir, 'package.json');
   const prettierIgnore = join(dir, '.prettierignore');
   const gitIgnore = join(dir, '.gitignore');
+  let installFailed = false;
 
   const pluginJSON = await readJSON(packageJson);
 
@@ -305,6 +306,7 @@ export const run = async (): Promise<void> => {
       }
     }
   } catch (e: any) {
+    installFailed = true;
     logger.warn('npm install failed, please, install the dependencies using your package manager of choice');
     // A repo that declares pnpm, yarn or bun fails `npm install` on purpose, so that is not
     // evidence of an incomplete migration.
@@ -343,7 +345,7 @@ export const run = async (): Promise<void> => {
       const gradleWrapperVersion = getGradleWrapperVersion(gradleWrapperPath);
       const outdatedGradle = gte(gradleVersion, gradleWrapperVersion);
 
-      if (outdatedGradle) {
+      if (!installFailed && outdatedGradle) {
         await updateFile(
           gradleWrapperPath,
           'services.gradle.org/distributions/gradle-',
@@ -368,6 +370,8 @@ export const run = async (): Promise<void> => {
             cwd: androidDir,
           },
         );
+      } else {
+        logger.warn('Skipped upgrading gradle wrapper files');
       }
     }
   }
@@ -420,14 +424,14 @@ export const run = async (): Promise<void> => {
   }
 
   if (installError) {
-    throw `The plugin files were migrated, but npm install failed, so the migration is incomplete.\nInstall the dependencies using your package manager of choice.\nThe migration itself does not need to be run again.\n\nnpm install said:\n${installError}`;
+    throw `Migration to Capacitor ${coreVersion} is incomplete because npm install failed. Check the log messages for more information.\nInstall the dependencies using your package manager of choice.\nnpm install said:\n${installError}`;
   }
 
   if (blockedPackages.length > 0) {
     throw `The plugin files were migrated, but ${formatBlockedScriptsError(blockedPackages)}`;
   }
 
-  logger.info('Plugin migrated to Capacitor 9!');
+  logger.info(`Plugin migrated to Capacitor ${coreVersion}!`);
 };
 
 // Rules in android/proguard-rules.pro only reach apps through consumerProguardFiles and the published files.
