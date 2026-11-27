@@ -431,7 +431,7 @@ export const run = async (): Promise<void> => {
     throw `The plugin files were migrated, but ${formatBlockedScriptsError(blockedPackages)}`;
   }
 
-  logger.info('Plugin migrated to Capacitor ${coreVersion}!');
+  logger.info(`Plugin migrated to Capacitor ${coreVersion}!`);
 };
 
 // Rules in android/proguard-rules.pro only reach apps through consumerProguardFiles and the published files.
